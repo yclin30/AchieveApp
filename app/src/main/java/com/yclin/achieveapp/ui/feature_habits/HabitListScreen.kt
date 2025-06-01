@@ -9,6 +9,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +46,7 @@ fun HabitListScreen(
                 .padding(innerPadding),
             contentAlignment = Alignment.Center
         ) {
-            // 现在使用空状态占位符，后续会替换为真实习惯列表
+            Text(text = "暂无习惯数据，点击 + 添加新习惯")
         }
     }
 }
