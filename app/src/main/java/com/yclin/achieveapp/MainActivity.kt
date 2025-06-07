@@ -22,8 +22,9 @@ import com.yclin.achieveapp.ui.components.AchieveBottomNavigation
 import com.yclin.achieveapp.ui.feature_dashboard.DashboardScreen
 import com.yclin.achieveapp.ui.feature_habits.add_edit.AddEditHabitScreen
 import com.yclin.achieveapp.ui.feature_habits.add_edit.AddEditHabitViewModel
+import com.yclin.achieveapp.ui.feature_habits.detail.HabitDetailScreen
+import com.yclin.achieveapp.ui.feature_habits.detail.HabitDetailViewModel
 import com.yclin.achieveapp.ui.feature_habits.list.HabitListScreen
-import com.yclin.achieveapp.ui.feature_habits.list.HabitListViewModel
 import com.yclin.achieveapp.ui.feature_tasks.add_edit.AddEditTaskScreen
 import com.yclin.achieveapp.ui.feature_tasks.add_edit.AddEditTaskViewModel
 import com.yclin.achieveapp.ui.feature_tasks.list.TaskListScreen
@@ -78,18 +79,23 @@ class MainActivity : ComponentActivity() {
                             }
 
                             composable(Screen.Habits.route) {
-                                val habitListViewModel: HabitListViewModel = viewModel(
-                                    factory = HabitListViewModel.Factory(application as AchieveApp)
+                                HabitListScreen(navController = navController)
+                            }
+
+                            // 添加任务页面
+                            composable(Screen.AddEditTask.route) {
+                                val addEditTaskViewModel: AddEditTaskViewModel = viewModel(
+                                    factory = AddEditTaskViewModel.provideFactory(-1L)
                                 )
-                                HabitListScreen(
+                                AddEditTaskScreen(
                                     navController = navController,
-                                    viewModel = habitListViewModel
+                                    viewModel = addEditTaskViewModel
                                 )
                             }
 
-                            // 任务新增/编辑
+                            // 编辑任务页面
                             composable(
-                                route = Screen.AddEditTask.route,
+                                route = "${Screen.AddEditTask.route}/{taskId}",
                                 arguments = listOf(
                                     navArgument("taskId") {
                                         type = NavType.LongType
@@ -107,9 +113,22 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // 习惯新增/编辑
+                            // ---------------------- 新增代码开始 ----------------------
+
+                            // 添加习惯页面
+                            composable(Screen.AddEditHabit.route) {
+                                val addEditHabitViewModel: AddEditHabitViewModel = viewModel(
+                                    factory = AddEditHabitViewModel.provideFactory(-1L)
+                                )
+                                AddEditHabitScreen(
+                                    navController = navController,
+                                    viewModel = addEditHabitViewModel
+                                )
+                            }
+
+                            // 编辑习惯页面
                             composable(
-                                route = Screen.AddEditHabit.route,
+                                route = "${Screen.AddEditHabit.route}/{habitId}",
                                 arguments = listOf(
                                     navArgument("habitId") {
                                         type = NavType.LongType
@@ -126,6 +145,26 @@ class MainActivity : ComponentActivity() {
                                     viewModel = addEditHabitViewModel
                                 )
                             }
+
+                            // 习惯详情页面
+                            composable(
+                                route = Screen.HabitDetail.route,
+                                arguments = listOf(
+                                    navArgument("habitId") {
+                                        type = NavType.LongType
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val habitId = backStackEntry.arguments?.getLong("habitId") ?: -1L
+                                val habitDetailViewModel: HabitDetailViewModel = viewModel(
+                                    factory = HabitDetailViewModel.provideFactory(habitId, application as AchieveApp)
+                                )
+                                HabitDetailScreen(
+                                    navController = navController,
+                                    viewModel = habitDetailViewModel
+                                )
+                            }
+                            // ---------------------- 新增代码结束 ----------------------
                         }
                     }
                 }
