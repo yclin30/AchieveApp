@@ -20,7 +20,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.yclin.achieveapp.ui.components.AchieveBottomNavigation
 import com.yclin.achieveapp.ui.feature_dashboard.DashboardScreen
-import com.yclin.achieveapp.ui.feature_habits.HabitListScreen
+import com.yclin.achieveapp.ui.feature_habits.add_edit.AddEditHabitScreen
+import com.yclin.achieveapp.ui.feature_habits.add_edit.AddEditHabitViewModel
+import com.yclin.achieveapp.ui.feature_habits.list.HabitListScreen
+import com.yclin.achieveapp.ui.feature_habits.list.HabitListViewModel
 import com.yclin.achieveapp.ui.feature_tasks.add_edit.AddEditTaskScreen
 import com.yclin.achieveapp.ui.feature_tasks.add_edit.AddEditTaskViewModel
 import com.yclin.achieveapp.ui.feature_tasks.list.TaskListScreen
@@ -42,7 +45,6 @@ class MainActivity : ComponentActivity() {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = navBackStackEntry?.destination?.route
 
-                    // 判断当前路由是否为主导航路由（应显示底部导航栏的路由）
                     val showBottomBar = currentRoute in listOf(
                         Screen.Dashboard.route,
                         Screen.Tasks.route,
@@ -51,7 +53,6 @@ class MainActivity : ComponentActivity() {
 
                     Scaffold(
                         bottomBar = {
-                            // 只在主屏幕显示底部导航栏
                             if (showBottomBar) {
                                 AchieveBottomNavigation(navController = navController)
                             }
@@ -62,13 +63,11 @@ class MainActivity : ComponentActivity() {
                             startDestination = Screen.Dashboard.route,
                             modifier = Modifier.padding(innerPadding)
                         ) {
-                            // 底部导航主页面
                             composable(Screen.Dashboard.route) {
                                 DashboardScreen(navController = navController)
                             }
 
                             composable(Screen.Tasks.route) {
-                                // 使用Factory创建TaskListViewModel实例
                                 val taskListViewModel: TaskListViewModel = viewModel(
                                     factory = TaskListViewModel.Factory(application as AchieveApp)
                                 )
@@ -79,24 +78,18 @@ class MainActivity : ComponentActivity() {
                             }
 
                             composable(Screen.Habits.route) {
-                                HabitListScreen(navController = navController)
-                            }
-
-                            // 添加任务页面
-                            composable(Screen.AddEditTask.route) {
-                                // 创建AddEditTaskViewModel实例，传入-1L表示新建任务
-                                val addEditTaskViewModel: AddEditTaskViewModel = viewModel(
-                                    factory = AddEditTaskViewModel.provideFactory(-1L)
+                                val habitListViewModel: HabitListViewModel = viewModel(
+                                    factory = HabitListViewModel.Factory(application as AchieveApp)
                                 )
-                                AddEditTaskScreen(
+                                HabitListScreen(
                                     navController = navController,
-                                    viewModel = addEditTaskViewModel
+                                    viewModel = habitListViewModel
                                 )
                             }
 
-                            // 编辑任务页面
+                            // 任务新增/编辑
                             composable(
-                                route = "${Screen.AddEditTask.route}/{taskId}",
+                                route = Screen.AddEditTask.route,
                                 arguments = listOf(
                                     navArgument("taskId") {
                                         type = NavType.LongType
@@ -111,6 +104,26 @@ class MainActivity : ComponentActivity() {
                                 AddEditTaskScreen(
                                     navController = navController,
                                     viewModel = addEditTaskViewModel
+                                )
+                            }
+
+                            // 习惯新增/编辑
+                            composable(
+                                route = Screen.AddEditHabit.route,
+                                arguments = listOf(
+                                    navArgument("habitId") {
+                                        type = NavType.LongType
+                                        defaultValue = -1L
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val habitId = backStackEntry.arguments?.getLong("habitId") ?: -1L
+                                val addEditHabitViewModel: AddEditHabitViewModel = viewModel(
+                                    factory = AddEditHabitViewModel.provideFactory(habitId)
+                                )
+                                AddEditHabitScreen(
+                                    navController = navController,
+                                    viewModel = addEditHabitViewModel
                                 )
                             }
                         }

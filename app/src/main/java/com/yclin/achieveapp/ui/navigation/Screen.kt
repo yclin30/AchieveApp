@@ -9,22 +9,27 @@ sealed class Screen(val route: String) {
     object Tasks : Screen("tasks")
     object Habits : Screen("habits")
 
-    // 后续可添加详情/编辑页面
+    // 任务详情
     object TaskDetail : Screen("task/{taskId}") {
         fun createRoute(taskId: Long): String = "task/$taskId"
     }
 
-    object AddEditTask : Screen("task/edit?taskId={taskId}") {
+    // 任务新增/编辑
+    object AddEditTask : Screen("task/edit/{taskId}") {
+        // taskId 为 null 表示新建，否则为编辑
         fun createRoute(taskId: Long? = null): String =
-            if (taskId != null) "task/edit?taskId=$taskId" else "task/edit"
+            if (taskId != null) "task/edit/$taskId" else "task/edit/-1"
     }
 
+    // 习惯详情
     object HabitDetail : Screen("habit/{habitId}") {
         fun createRoute(habitId: Long): String = "habit/$habitId"
     }
 
-    object AddEditHabit : Screen("habit/edit?habitId={habitId}") {
+    // 习惯新增/编辑
+    object AddEditHabit : Screen("habit/edit/{habitId}") {
         fun createRoute(habitId: Long? = null): String =
-            if (habitId != null) "habit/edit?habitId=$habitId" else "habit/edit"
+            if (habitId != null) "habit/edit/$habitId" else "habit/edit/-1"
     }
+
 }
