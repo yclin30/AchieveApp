@@ -80,6 +80,13 @@ interface HabitCompletionDao {
     """)
     suspend fun isHabitCompletedOnDate(habitId: Long, date: LocalDate): Boolean
 
+   /**
+    * 根据习惯ID和日期删除完成记录
+    * @param habitId 习惯ID
+    * @param date 指定日期
+    */
+   @Query("DELETE FROM habit_completions WHERE habitId = :habitId AND date = :date")
+   suspend fun deleteCompletionByHabitIdAndDate(habitId: Long, date: LocalDate)
     /**
      * 标记习惯在指定日期为已完成或未完成
      * @param habitId 习惯ID

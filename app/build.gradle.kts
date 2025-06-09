@@ -65,6 +65,7 @@ dependencies {
     // 导航
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.espresso.core)
+    implementation(libs.generativeai)
 
     // 测试
     testImplementation(libs.junit)

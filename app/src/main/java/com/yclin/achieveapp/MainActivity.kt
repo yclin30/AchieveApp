@@ -21,6 +21,7 @@ import androidx.navigation.navArgument // 定义导航参数
 import com.yclin.achieveapp.ui.components.AchieveBottomNavigation
 // 各个功能的屏幕和 ViewModel
 import com.yclin.achieveapp.ui.feature_dashboard.DashboardScreen
+import com.yclin.achieveapp.ui.feature_dashboard.DashboardViewModel
 import com.yclin.achieveapp.ui.feature_habits.add_edit.AddEditHabitScreen
 import com.yclin.achieveapp.ui.feature_habits.add_edit.AddEditHabitViewModel
 import com.yclin.achieveapp.ui.feature_habits.detail.HabitDetailScreen
@@ -86,8 +87,22 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(innerPadding) // 应用 Scaffold 提供的内边距
                         ) {
                             // --- 仪表盘屏幕 ---
-                            composable(Screen.Dashboard.route) { // 定义仪表盘屏幕的导航目标
-                                DashboardScreen(navController = navController) // 加载仪表盘屏幕的 Composable
+                            composable(Screen.Dashboard.route) {
+                                // 获取 Application 实例
+                                val application = this@MainActivity.application as AchieveApp
+                                // 创建 DashboardViewModel 实例
+                                val dashboardViewModel: DashboardViewModel = viewModel(
+                                    factory = DashboardViewModel.provideFactory(
+                                        taskDao = application.database.taskDao(), // 假设从 Application 获取 DAO
+                                        habitDao = application.database.habitDao(),
+                                        habitCompletionDao = application.database.habitCompletionDao(),
+                                        application = application
+                                    )
+                                )
+                                DashboardScreen(
+                                    navController = navController,
+                                    viewModel = dashboardViewModel // 传递 ViewModel
+                                )
                             }
 
                             // --- 任务列表屏幕 ---
