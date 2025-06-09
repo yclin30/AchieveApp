@@ -7,6 +7,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+// 建议为详情页也添加一个图标，如果不想点击整个卡片的话
+// import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.yclin.achieveapp.data.database.entity.Habit
 import com.yclin.achieveapp.ui.navigation.Screen
+import com.yclin.achieveapp.AchieveApp // 确保引入 AchieveApp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,7 +26,7 @@ fun HabitListScreen(
     navController: NavController,
     viewModel: HabitListViewModel = viewModel(
         factory = HabitListViewModel.Factory(
-            navController.context.applicationContext as com.yclin.achieveapp.AchieveApp
+            navController.context.applicationContext as AchieveApp // 确保类型转换正确
         )
     ),
     modifier: Modifier = Modifier
@@ -33,16 +36,15 @@ fun HabitListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("习惯追踪") },
-                actions = {
-                    // 可以添加其他操作按钮
-                }
+                title = { Text("习惯追踪") }
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    navController.navigate(Screen.AddEditHabit.createRoute(-1L))
+                    // 跳转到新增习惯页面，使用 Screen.AddEditHabit.route (不带参数)
+                    // 或者使用 createRoute 传入 null 或 -1L
+                    navController.navigate(Screen.AddEditHabit.createRoute(null))
                 }
             ) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "添加习惯")
@@ -54,29 +56,28 @@ fun HabitListScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when {
-
-                habits.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("暂无习惯，点击 + 添加")
-                    }
+            if (habits.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("暂无习惯，点击 + 添加")
                 }
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(habits, key = { it.id }) { habit ->
-                            HabitItem(
-                                habit = habit,
-                                onEdit = {
-                                    navController.navigate(Screen.AddEditHabit.createRoute(habit.id))
-                                },
-                                onDelete = { viewModel.deleteHabit(habit) }
-                            )
-                        }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(habits, key = { it.id }) { habit ->
+                        HabitItem(
+                            habit = habit,
+                            onItemClick = { // 修改这里：整个条目点击进入详情
+                                navController.navigate(Screen.HabitDetail.createRoute(habit.id))
+                            },
+                            onEdit = {
+                                navController.navigate(Screen.AddEditHabit.createRoute(habit.id))
+                            },
+                            onDelete = { viewModel.deleteHabit(habit) }
+                        )
                     }
                 }
             }
@@ -87,12 +88,13 @@ fun HabitListScreen(
 @Composable
 fun HabitItem(
     habit: Habit,
+    onItemClick: () -> Unit, // 新增参数，用于整个条目点击
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onEdit  // 点击整个卡片也可以编辑
+        onClick = onItemClick  // 点击整个卡片跳转到详情
     ) {
         Row(
             modifier = Modifier
@@ -106,9 +108,7 @@ fun HabitItem(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
-
                 Spacer(modifier = Modifier.height(4.dp))
-
                 if (habit.description.isNotBlank()) {
                     Text(
                         text = habit.description,
@@ -117,7 +117,6 @@ fun HabitItem(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
-
                 Row {
                     Text(
                         text = "连续: ${habit.currentStreak} 天",
@@ -129,22 +128,21 @@ fun HabitItem(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
-
                 Text(
                     text = if (habit.frequencyType == 1) "每日"
                     else "每周${weekDaysToStr(habit.weekDays)}",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-
+            // 编辑按钮
             IconButton(onClick = onEdit) {
                 Icon(
-                    imageVector = Icons.Default.Edit,  // 使用编辑图标更合适
+                    imageVector = Icons.Default.Edit,
                     contentDescription = "编辑习惯"
                 )
             }
+            // 删除按钮
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,
