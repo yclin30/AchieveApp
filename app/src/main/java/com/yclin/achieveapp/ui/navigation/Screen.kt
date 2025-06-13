@@ -32,4 +32,7 @@ sealed class Screen(val route: String) {
             if (habitId != null) "habit/edit/$habitId" else "habit/edit/-1"
     }
 
+    object Login : Screen("login")
+    object Register : Screen("register")
+    object Profile : Screen("profile")
 }

@@ -84,4 +84,9 @@ dependencies {
     //noinspection GradleDependency
     implementation(libs.dagger.hilt.android.v248)
     ksp(libs.dagger.hilt.android.compiler.v248)
+
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp.logging)
+    implementation(libs.gson)
 }

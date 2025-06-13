@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme // Material 3 主题相关
 import androidx.compose.material3.Scaffold // Material 3 脚手架布局
 import androidx.compose.material3.Surface // Material 3 表面组件
-import androidx.compose.runtime.getValue // 导入 getValue 以便使用 by 委托
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel // 导入 viewModel Composable 函数
 import androidx.navigation.NavType // 导航参数类型
@@ -35,6 +35,9 @@ import com.yclin.achieveapp.ui.feature_tasks.list.TaskListViewModel
 import com.yclin.achieveapp.ui.navigation.Screen
 // 应用主题
 import com.yclin.achieveapp.ui.theme.AchieveTheme
+import com.yclin.achieveapp.ui.feature_auth.LoginScreen
+import com.yclin.achieveapp.ui.feature_auth.RegisterScreen
+import com.yclin.achieveapp.ui.feature_profile.ProfileScreen
 
 /**
  * 应用的主 Activity，是所有 UI 的入口点。
@@ -66,7 +69,8 @@ class MainActivity : ComponentActivity() {
                     val showBottomBar = currentRoute in listOf(
                         Screen.Dashboard.route,
                         Screen.Tasks.route,
-                        Screen.Habits.route
+                        Screen.Habits.route,
+                        Screen.Profile.route
                     )
 
                     // Scaffold 是一个高级别的 Material Design 布局组件，
@@ -83,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         // NavHost 是导航图的容器，在这里定义所有可导航的目标（Composable 函数）
                         NavHost(
                             navController = navController, // 将 NavController 传递给 NavHost
-                            startDestination = Screen.Dashboard.route, // 设置应用的起始导航目标
+                            startDestination =  Screen.Login.route, // 设置登录的起始导航目标
                             modifier = Modifier.padding(innerPadding) // 应用 Scaffold 提供的内边距
                         ) {
                             // --- 仪表盘屏幕 ---
@@ -213,6 +217,42 @@ class MainActivity : ComponentActivity() {
                                 HabitDetailScreen( // 加载习惯详情屏幕的 Composable
                                     navController = navController,
                                     viewModel = habitDetailViewModel
+                                )
+                            }
+                            // --- 登录页面 ---
+                            composable(Screen.Login.route) {
+                                LoginScreen(
+                                    onLogin = { username, password ->
+                                        // 在这里实现登录逻辑，登录成功后可以跳转到主界面
+                                        // navController.navigate(Screen.Dashboard.route) { popUpTo(Screen.Login.route) { inclusive = true } }
+                                    },
+                                    onNavigateToRegister = {
+                                        navController.navigate(Screen.Register.route)
+                                    }
+                                )
+                            }
+
+// --- 注册页面 ---
+                            composable(Screen.Register.route) {
+                                RegisterScreen(
+                                    onRegister = { username, email, password ->
+                                        // 在这里实现注册逻辑，注册成功后可以跳转到登录页或主界面
+                                        // navController.navigate(Screen.Login.route) { popUpTo(Screen.Register.route) { inclusive = true } }
+                                    },
+                                    onNavigateToLogin = {
+                                        navController.popBackStack() // 返回上一页（通常是登录页）
+                                    }
+                                )
+                            }
+
+// --- 我的页面 ---
+                            composable(Screen.Profile.route) {
+                                ProfileScreen(
+                                    user = null, // 这里传入当前登录的用户对象，通常从 ViewModel 获取
+                                    onLogout = {
+                                        // 实现退出登录逻辑，并跳转到登录页
+                                        // navController.navigate(Screen.Login.route) { popUpTo(0) } // 彻底清空返回栈
+                                    }
                                 )
                             }
                         } // NavHost 结束
