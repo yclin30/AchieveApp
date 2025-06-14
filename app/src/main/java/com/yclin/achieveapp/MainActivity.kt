@@ -5,21 +5,20 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme // Material 3 主题相关
-import androidx.compose.material3.Scaffold // Material 3 脚手架布局
-import androidx.compose.material3.Surface // Material 3 表面组件
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel // 导入 viewModel Composable 函数
-import androidx.navigation.NavType // 导航参数类型
-import androidx.navigation.compose.NavHost // 导航容器
-import androidx.navigation.compose.composable // 定义导航目标
-import androidx.navigation.compose.currentBackStackEntryAsState // 获取当前导航状态
-import androidx.navigation.compose.rememberNavController // 创建和记住 NavController
-import androidx.navigation.navArgument // 定义导航参数
-// UI 组件
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.yclin.achieveapp.ui.components.AchieveBottomNavigation
-// 各个功能的屏幕和 ViewModel
 import com.yclin.achieveapp.ui.feature_dashboard.DashboardScreen
 import com.yclin.achieveapp.ui.feature_dashboard.DashboardViewModel
 import com.yclin.achieveapp.ui.feature_habits.add_edit.AddEditHabitScreen
@@ -31,41 +30,31 @@ import com.yclin.achieveapp.ui.feature_tasks.add_edit.AddEditTaskScreen
 import com.yclin.achieveapp.ui.feature_tasks.add_edit.AddEditTaskViewModel
 import com.yclin.achieveapp.ui.feature_tasks.list.TaskListScreen
 import com.yclin.achieveapp.ui.feature_tasks.list.TaskListViewModel
-// 导航路由定义
 import com.yclin.achieveapp.ui.navigation.Screen
-// 应用主题
 import com.yclin.achieveapp.ui.theme.AchieveTheme
 import com.yclin.achieveapp.ui.feature_auth.LoginScreen
 import com.yclin.achieveapp.ui.feature_auth.RegisterScreen
 import com.yclin.achieveapp.ui.feature_profile.ProfileScreen
+import com.yclin.achieveapp.ui.feature_auth.AuthViewModel
+import com.yclin.achieveapp.ui.feature_auth.AuthViewModelFactory
 
-/**
- * 应用的主 Activity，是所有 UI 的入口点。
- */
 class MainActivity : ComponentActivity() {
-    /**
-     * Activity 创建时调用。
-     * 在这里设置 Compose UI 内容。
-     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 使用 setContent 设置 Compose UI
         setContent {
-            // 应用自定义的 AchieveTheme 主题
             AchieveTheme {
-                // Surface 是一个 Material Design 组件，用于绘制带有背景颜色和阴影的区域
                 Surface(
-                    modifier = Modifier.fillMaxSize(), // 使 Surface 填满整个可用空间
-                    color = MaterialTheme.colorScheme.background // 设置背景色为主题定义的背景色
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    // 创建并记住一个 NavController 实例，用于在 Composable 之间导航
                     val navController = rememberNavController()
-                    // 获取当前导航栈的条目作为 Compose 状态，当路由改变时，UI 会自动更新
+                    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(application))
+                    val user by authViewModel.user.collectAsState()
+                    val loading by authViewModel.loading.collectAsState()
+                    val error by authViewModel.error.collectAsState()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    // 从导航栈条目中获取当前路由的字符串路径
                     val currentRoute = navBackStackEntry?.destination?.route
 
-                    // 判断当前路由是否是预定义的主屏幕路由之一，用于决定是否显示底部导航栏
                     val showBottomBar = currentRoute in listOf(
                         Screen.Dashboard.route,
                         Screen.Tasks.route,
@@ -73,31 +62,74 @@ class MainActivity : ComponentActivity() {
                         Screen.Profile.route
                     )
 
-                    // Scaffold 是一个高级别的 Material Design 布局组件，
-                    // 它提供了放置 TopAppBar, BottomAppBar, FloatingActionButton 等标准元素的槽位。
+                    // 登录后进主界面，未登录进登录页
+                    val startDestination = if (user == null) Screen.Login.route else Screen.Dashboard.route
+
                     Scaffold(
-                        // 定义底部导航栏的内容
                         bottomBar = {
-                            // 只有当 showBottomBar 为 true 时才显示 AchieveBottomNavigation
                             if (showBottomBar) {
                                 AchieveBottomNavigation(navController = navController)
                             }
                         }
-                    ) { innerPadding -> // innerPadding 是 Scaffold 提供的，用于确保 NavHost 内容不会被 AppBar 或 BottomBar遮挡
-                        // NavHost 是导航图的容器，在这里定义所有可导航的目标（Composable 函数）
+                    ) { innerPadding ->
                         NavHost(
-                            navController = navController, // 将 NavController 传递给 NavHost
-                            startDestination =  Screen.Login.route, // 设置登录的起始导航目标
-                            modifier = Modifier.padding(innerPadding) // 应用 Scaffold 提供的内边距
+                            navController = navController,
+                            startDestination = startDestination,
+                            modifier = Modifier.padding(innerPadding)
                         ) {
-                            // --- 仪表盘屏幕 ---
+                            // ========== 登录页面 =========
+                            composable(Screen.Login.route) {
+                                LoginScreen(
+                                    onLogin = { username, password ->
+                                        authViewModel.login(username, password) {
+                                            navController.navigate(Screen.Dashboard.route) {
+                                                popUpTo(Screen.Login.route) { inclusive = true }
+                                            }
+                                        }
+                                    },
+                                    onNavigateToRegister = {
+                                        navController.navigate(Screen.Register.route)
+                                    },
+                                    loginError = error,
+                                    loading = loading
+                                )
+                            }
+                            // ========== 注册页面 =========
+                            composable(Screen.Register.route) {
+                                RegisterScreen(
+                                    onRegister = { username, email, password ->
+                                        authViewModel.register(username, email, password) {
+                                            navController.navigate(Screen.Login.route) {
+                                                popUpTo(Screen.Register.route) { inclusive = true }
+                                            }
+                                        }
+                                    },
+                                    onNavigateToLogin = {
+                                        navController.popBackStack()
+                                    },
+                                    registerError = error,
+                                    loading = loading
+                                )
+                            }
+                            // ========== 我的页面 =========
+                            composable(Screen.Profile.route) {
+                                ProfileScreen(
+                                    user = user,
+                                    onLogout = {
+                                        authViewModel.logout {
+                                            navController.navigate(Screen.Login.route) {
+                                                popUpTo(0)
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            // ========== 仪表盘 =========
                             composable(Screen.Dashboard.route) {
-                                // 获取 Application 实例
                                 val application = this@MainActivity.application as AchieveApp
-                                // 创建 DashboardViewModel 实例
                                 val dashboardViewModel: DashboardViewModel = viewModel(
                                     factory = DashboardViewModel.provideFactory(
-                                        taskDao = application.database.taskDao(), // 假设从 Application 获取 DAO
+                                        taskDao = application.database.taskDao(),
                                         habitDao = application.database.habitDao(),
                                         habitCompletionDao = application.database.habitCompletionDao(),
                                         application = application
@@ -105,160 +137,104 @@ class MainActivity : ComponentActivity() {
                                 )
                                 DashboardScreen(
                                     navController = navController,
-                                    viewModel = dashboardViewModel // 传递 ViewModel
+                                    viewModel = dashboardViewModel
                                 )
                             }
-
-                            // --- 任务列表屏幕 ---
-                            composable(Screen.Tasks.route) { // 定义任务列表屏幕的导航目标
-                                // 使用 viewModel() 获取 TaskListViewModel 实例
-                                // 通过 Factory 传入 Application 实例，因为 ViewModel 可能需要它
+                            // ========== 任务列表 =========
+                            composable(Screen.Tasks.route) {
                                 val taskListViewModel: TaskListViewModel = viewModel(
                                     factory = TaskListViewModel.Factory(application as AchieveApp)
                                 )
-                                TaskListScreen( // 加载任务列表屏幕的 Composable
+                                TaskListScreen(
                                     navController = navController,
                                     viewModel = taskListViewModel
                                 )
                             }
-
-                            // --- 习惯列表屏幕 ---
-                            composable(Screen.Habits.route) { // 定义习惯列表屏幕的导航目标
-                                // 注意：HabitListScreen 在这里没有显式传递 ViewModel。
-                                // 它可能内部使用 viewModel() 获取默认实例，或者其 ViewModel 不需要 Application。
-                                HabitListScreen(navController = navController) // 加载习惯列表屏幕的 Composable
+                            // ========== 习惯列表 =========
+                            composable(Screen.Habits.route) {
+                                HabitListScreen(navController = navController)
                             }
-
-                            // --- 添加任务页面 ---
-                            // 定义添加新任务的导航目标
+                            // ========== 添加/编辑任务 =========
                             composable(Screen.AddEditTask.route) {
-                                // 获取 AddEditTaskViewModel 实例，传入 -1L 表示这是一个新建任务的操作
                                 val addEditTaskViewModel: AddEditTaskViewModel = viewModel(
                                     factory = AddEditTaskViewModel.provideFactory(-1L)
                                 )
-                                AddEditTaskScreen( // 加载添加/编辑任务屏幕的 Composable
+                                AddEditTaskScreen(
                                     navController = navController,
                                     viewModel = addEditTaskViewModel
                                 )
                             }
-
-                            // --- 编辑任务页面 ---
-                            // 定义编辑现有任务的导航目标，路由中包含一个 taskId 参数
                             composable(
-                                route = "${Screen.AddEditTask.route}/{taskId}", // 路由路径包含参数 taskId
-                                arguments = listOf( // 定义导航参数
-                                    navArgument("taskId") { // 参数名为 "taskId"
-                                        type = NavType.LongType // 参数类型为 Long
-                                        defaultValue = -1L      // 如果导航时未提供 taskId，则默认为 -1L
+                                route = "${Screen.AddEditTask.route}/{taskId}",
+                                arguments = listOf(
+                                    navArgument("taskId") {
+                                        type = NavType.LongType
+                                        defaultValue = -1L
                                     }
                                 )
-                            ) { backStackEntry -> // backStackEntry 包含当前路由的信息和参数
-                                // 从 backStackEntry 中获取 taskId 参数值
+                            ) { backStackEntry ->
                                 val taskId = backStackEntry.arguments?.getLong("taskId") ?: -1L
-                                // 获取 AddEditTaskViewModel 实例，传入获取到的 taskId
                                 val addEditTaskViewModel: AddEditTaskViewModel = viewModel(
                                     factory = AddEditTaskViewModel.provideFactory(taskId)
                                 )
-                                AddEditTaskScreen( // 加载添加/编辑任务屏幕的 Composable
+                                AddEditTaskScreen(
                                     navController = navController,
                                     viewModel = addEditTaskViewModel
                                 )
                             }
-
-                            // --- 添加习惯页面 ---
-                            composable(Screen.AddEditHabit.route) { // 定义添加新习惯的导航目标
+                            // ========== 添加/编辑习惯 =========
+                            composable(Screen.AddEditHabit.route) {
                                 val addEditHabitViewModel: AddEditHabitViewModel = viewModel(
-                                    factory = AddEditHabitViewModel.provideFactory(-1L) // -1L 表示新建习惯
+                                    factory = AddEditHabitViewModel.provideFactory(-1L)
                                 )
-                                AddEditHabitScreen( // 加载添加/编辑习惯屏幕的 Composable
+                                AddEditHabitScreen(
                                     navController = navController,
                                     viewModel = addEditHabitViewModel
                                 )
                             }
-
-                            // --- 编辑习惯页面 ---
                             composable(
-                                route = "${Screen.AddEditHabit.route}/{habitId}", // 路由路径包含参数 habitId
+                                route = "${Screen.AddEditHabit.route}/{habitId}",
                                 arguments = listOf(
-                                    navArgument("habitId") { // 参数名为 "habitId"
-                                        type = NavType.LongType // 参数类型为 Long
-                                        defaultValue = -1L      // 默认值为 -1L
+                                    navArgument("habitId") {
+                                        type = NavType.LongType
+                                        defaultValue = -1L
                                     }
                                 )
                             ) { backStackEntry ->
-                                val habitId = backStackEntry.arguments?.getLong("habitId") ?: -1L // 获取 habitId
+                                val habitId = backStackEntry.arguments?.getLong("habitId") ?: -1L
                                 val addEditHabitViewModel: AddEditHabitViewModel = viewModel(
-                                    factory = AddEditHabitViewModel.provideFactory(habitId) // 传入 habitId
+                                    factory = AddEditHabitViewModel.provideFactory(habitId)
                                 )
-                                AddEditHabitScreen( // 加载添加/编辑习惯屏幕的 Composable
+                                AddEditHabitScreen(
                                     navController = navController,
                                     viewModel = addEditHabitViewModel
                                 )
                             }
-
-                            // --- 习惯详情页面 ---
-                            // 定义习惯详情页面的导航目标，路由中包含一个 habitId 参数
+                            // ========== 习惯详情 =========
                             composable(
-                                route = Screen.HabitDetail.route, // Screen.HabitDetail.route 应为 "habit_detail/{habitId}" 或类似形式
+                                route = Screen.HabitDetail.route,
                                 arguments = listOf(
-                                    navArgument("habitId") { // 参数名为 "habitId"
-                                        type = NavType.LongType // 参数类型为 Long，这里没有默认值，表示必须提供
+                                    navArgument("habitId") {
+                                        type = NavType.LongType
                                     }
                                 )
                             ) { backStackEntry ->
-                                val habitId = backStackEntry.arguments?.getLong("habitId") ?: -1L // 获取 habitId
-                                // 获取 HabitDetailViewModel 实例，通过工厂传入 habitId 和 Application 实例
+                                val habitId = backStackEntry.arguments?.getLong("habitId") ?: -1L
                                 val habitDetailViewModel: HabitDetailViewModel = viewModel(
                                     factory = HabitDetailViewModel.provideFactory(
                                         habitId,
-                                        application as AchieveApp // 将 Application 实例传递给 ViewModel 工厂
+                                        application as AchieveApp
                                     )
                                 )
-                                HabitDetailScreen( // 加载习惯详情屏幕的 Composable
+                                HabitDetailScreen(
                                     navController = navController,
                                     viewModel = habitDetailViewModel
                                 )
                             }
-                            // --- 登录页面 ---
-                            composable(Screen.Login.route) {
-                                LoginScreen(
-                                    onLogin = { username, password ->
-                                        // 在这里实现登录逻辑，登录成功后可以跳转到主界面
-                                        // navController.navigate(Screen.Dashboard.route) { popUpTo(Screen.Login.route) { inclusive = true } }
-                                    },
-                                    onNavigateToRegister = {
-                                        navController.navigate(Screen.Register.route)
-                                    }
-                                )
-                            }
-
-// --- 注册页面 ---
-                            composable(Screen.Register.route) {
-                                RegisterScreen(
-                                    onRegister = { username, email, password ->
-                                        // 在这里实现注册逻辑，注册成功后可以跳转到登录页或主界面
-                                        // navController.navigate(Screen.Login.route) { popUpTo(Screen.Register.route) { inclusive = true } }
-                                    },
-                                    onNavigateToLogin = {
-                                        navController.popBackStack() // 返回上一页（通常是登录页）
-                                    }
-                                )
-                            }
-
-// --- 我的页面 ---
-                            composable(Screen.Profile.route) {
-                                ProfileScreen(
-                                    user = null, // 这里传入当前登录的用户对象，通常从 ViewModel 获取
-                                    onLogout = {
-                                        // 实现退出登录逻辑，并跳转到登录页
-                                        // navController.navigate(Screen.Login.route) { popUpTo(0) } // 彻底清空返回栈
-                                    }
-                                )
-                            }
-                        } // NavHost 结束
-                    } // Scaffold 结束
-                } // Surface 结束
-            } // AchieveTheme 结束
-        } // setContent 结束
-    } // onCreate 结束
-} // MainActivity 类结束
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

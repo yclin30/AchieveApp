@@ -49,6 +49,12 @@ fun AchieveBottomNavigation(
             route = Screen.Habits.route,
             selectedIcon = Icons.Filled.Favorite,
             unselectedIcon = Icons.Outlined.Favorite
+        ),
+        BottomNavItem(
+            label = "个人",
+            route = Screen.Profile.route,
+            selectedIcon = Icons.Filled.Favorite, // 可以替换为其他图标
+            unselectedIcon = Icons.Outlined.Favorite // 可以替换为其他图标
         )
     )
 
