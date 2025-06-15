@@ -40,6 +40,8 @@ interface HabitRepository {
     suspend fun syncHabitsFromRemote(userId: Long)
     suspend fun syncHabitToRemote(habit: Habit)
     suspend fun syncDeleteHabitRemote(habit: Habit)
+    suspend fun safeSyncToCloud(userId: Long)
+
 }
 /**
  * HabitRepository接口的实现类
@@ -49,7 +51,7 @@ interface HabitRepository {
 class HabitRepositoryImpl @Inject constructor(
     private val habitDao: HabitDao,
     private val habitCompletionDao: HabitCompletionDao,
-    private val remoteApi: JsonServerApi // 新增
+    private val remoteApi: JsonServerApi
 ) : HabitRepository {
 
     override fun getAllHabits(userId: Long): Flow<List<Habit>> =
@@ -82,7 +84,7 @@ class HabitRepositoryImpl @Inject constructor(
         val id = habitDao.insertHabit(habit)
         try {
             syncHabitToRemote(habit.copy(id = id))
-        } catch (_: Exception) { /* 忽略同步失败，后续可重试 */ }
+        } catch (_: Exception) { }
         return id
     }
 
@@ -94,10 +96,8 @@ class HabitRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteHabit(habit: Habit) {
-        habitDao.deleteHabit(habit)
-        try {
-            syncDeleteHabitRemote(habit)
-        } catch (_: Exception) {}
+        habitDao.markHabitDeleted(habit.id, habit.userId)
+        // 不立即物理删除
     }
 
     override suspend fun isHabitCompletedOnDate(habitId: Long, date: LocalDate, userId: Long): Boolean =
@@ -165,26 +165,60 @@ class HabitRepositoryImpl @Inject constructor(
         habitDao.updateHabitStreaks(habitId, userId, currentStreak, longestStreak)
     }
 
-    // ======== 新增：同步远程API相关 ========
+    // ======== 新增：同步相关 ========
 
+    /**
+     * 从云端拉取习惯并覆盖本地（防呆：云端无数据时不覆盖本地）
+     */
     override suspend fun syncHabitsFromRemote(userId: Long) {
-        val remoteHabits = remoteApi.getHabits(userId)
-            .map { it.toHabit() }
+        val remoteHabits = remoteApi.getHabits(userId).map { it.toHabit() }
+        // 防止云端空数据导致本地被误清空
+        if (remoteHabits.isEmpty()) {
+            // 可在UI层showSnackbar("云端无数据，本地未被覆盖")
+            return
+        }
         habitDao.replaceAllHabitsByUser(userId, remoteHabits)
     }
 
+    /**
+     * 上传本地所有习惯到云端（防呆：本地无数据时不操作）
+     */
+    suspend fun uploadAllHabitsToRemote(userId: Long) {
+        val localHabits = habitDao.getAllHabits(userId)
+        if (localHabits.isEmpty()) {
+            // 可在UI层showSnackbar("本地无数据，未上传到云端")
+            return
+        }
+        localHabits.forEach { habit ->
+            syncHabitToRemote(habit)
+        }
+    }
+
+    /**
+     * 单个同步本地习惯到云端
+     */
     override suspend fun syncHabitToRemote(habit: Habit) {
         val remoteHabit = habit.toRemoteHabit()
         try {
-            // 如果 habit.id 为 0，使用 POST，否则 PUT
             if (remoteHabit.id == 0L) {
-                remoteApi.addHabit(remoteHabit)
+                remoteApi.addHabit(remoteHabit) // 新建
             } else {
-                remoteApi.updateHabit(remoteHabit.id, remoteHabit)
+                try {
+                    remoteApi.updateHabit(remoteHabit.id, remoteHabit) // 更新
+                } catch (e: Exception) {
+                    if (isNotFoundError(e)) {
+                        remoteApi.addHabit(remoteHabit) // 404则降级为新增
+                    } else {
+                        throw e
+                    }
+                }
             }
         } catch (e: Exception) {
-            // 可以记录日志或抛出
+            // 可记录日志
         }
+    }
+    private fun isNotFoundError(e: Exception): Boolean {
+        return e is retrofit2.HttpException && e.code() == 404
     }
 
     override suspend fun syncDeleteHabitRemote(habit: Habit) {
@@ -193,5 +227,21 @@ class HabitRepositoryImpl @Inject constructor(
                 remoteApi.deleteHabit(habit.id)
             }
         } catch (e: Exception) {}
+    }
+    override suspend fun safeSyncToCloud(userId: Long) {
+        // 1. 先同步本地已删除的习惯到云端
+        val deletedHabits = habitDao.getAllDeletedHabits(userId)
+        for (habit in deletedHabits) {
+            try {
+                syncDeleteHabitRemote(habit)
+            } catch (_: Exception) {}
+            // 云端删除后可物理删除本地
+            // habitDao.deleteHabit(habit)
+        }
+        // 2. 再同步未删除的习惯到云端
+        val notDeletedHabits = habitDao.getAllNotDeletedHabits(userId)
+        for (habit in notDeletedHabits) {
+            syncHabitToRemote(habit)
+        }
     }
 }

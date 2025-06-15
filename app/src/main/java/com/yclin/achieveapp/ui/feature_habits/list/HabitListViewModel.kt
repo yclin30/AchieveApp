@@ -40,8 +40,21 @@ class HabitListViewModel(
         }
     }
 
+    fun uploadHabitsToRemote() {
+        viewModelScope.launch {
+            try {
+                // 推荐直接让Repository实现安全同步
+                habitRepository.safeSyncToCloud(userId)
+                _syncEvent.emit(SyncUiEvent.Success("全部习惯已安全上传到云端"))
+            } catch (e: Exception) {
+                _syncEvent.emit(SyncUiEvent.Error("上传失败: ${e.message ?: "未知错误"}"))
+            }
+        }
+    }
+
     fun deleteHabit(habit: Habit) {
         viewModelScope.launch {
+            // 只软删除
             habitRepository.deleteHabit(habit)
         }
     }

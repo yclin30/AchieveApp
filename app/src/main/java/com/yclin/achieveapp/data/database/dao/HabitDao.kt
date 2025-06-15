@@ -19,16 +19,16 @@ interface HabitDao {
     @Query("SELECT * FROM habits WHERE id = :id AND userId = :userId")
     suspend fun getHabitById(id: Long, userId: Long): Habit?
 
-    @Query("SELECT * FROM habits WHERE userId = :userId ORDER BY name ASC")
+    // ========= 关键：加 deleted = 0 =========
+    @Query("SELECT * FROM habits WHERE userId = :userId AND deleted = 0 ORDER BY name ASC")
     fun getAllHabitsFlow(userId: Long): Flow<List<Habit>>
 
-    // 新增：获取所有习惯（非 Flow），用于同步
-    @Query("SELECT * FROM habits WHERE userId = :userId ORDER BY name ASC")
+    @Query("SELECT * FROM habits WHERE userId = :userId AND deleted = 0 ORDER BY name ASC")
     suspend fun getAllHabits(userId: Long): List<Habit>
 
     @Query("""
         SELECT * FROM habits 
-        WHERE userId = :userId AND 
+        WHERE userId = :userId AND deleted = 0 AND
               (frequencyType = 1 OR (frequencyType = 2 AND (weekDays & :todayBit) != 0))
         ORDER BY name ASC
     """)
@@ -43,6 +43,14 @@ interface HabitDao {
     """)
     suspend fun updateHabitStreaks(habitId: Long, userId: Long, currentStreak: Int, longestStreak: Int)
 
+
+    // ===== 软删除相关 =====
+    @Query("SELECT * FROM habits WHERE userId = :userId AND deleted = 1")
+    suspend fun getAllDeletedHabits(userId: Long): List<Habit>
+
+    @Query("UPDATE habits SET deleted = 1 WHERE id = :habitId AND userId = :userId")
+    suspend fun markHabitDeleted(habitId: Long, userId: Long)
+
     // ====== 新增：同步相关 ======
     @Query("DELETE FROM habits WHERE userId = :userId")
     suspend fun deleteAllHabitsByUser(userId: Long)
@@ -53,6 +61,10 @@ interface HabitDao {
     @Transaction
     suspend fun replaceAllHabitsByUser(userId: Long, newHabits: List<Habit>) {
         deleteAllHabitsByUser(userId)
-        insertAllHabits(newHabits)
+        if (newHabits.isNotEmpty()) {
+            insertAllHabits(newHabits)
+        }
     }
+    @Query("SELECT * FROM habits WHERE userId = :userId AND deleted = 0 ORDER BY name ASC")
+    suspend fun getAllNotDeletedHabits(userId: Long): List<Habit>
 }

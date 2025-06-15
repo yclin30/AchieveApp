@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,6 +58,9 @@ fun HabitListScreen(
                 actions = {
                     IconButton(onClick = { viewModel.syncHabits() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "同步")
+                    }
+                    IconButton(onClick = { viewModel.uploadHabitsToRemote() }) {
+                        Icon(Icons.Default.Upload, contentDescription = "上传到云端")
                     }
                 }
             )

@@ -34,5 +34,7 @@ data class Task(
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     // 最后修改时间
-    val updatedAt: LocalDateTime = LocalDateTime.now()
+    val updatedAt: LocalDateTime = LocalDateTime.now(),
+
+    val deleted: Boolean = false // 新增
 )
