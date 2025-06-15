@@ -17,6 +17,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 class AddEditTaskViewModel(
+    private val userId: Long,
     private val taskRepository: TaskRepository,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -46,7 +47,6 @@ class AddEditTaskViewModel(
     private val _operationSuccess = MutableStateFlow(false)
     val operationSuccess: StateFlow<Boolean> = _operationSuccess.asStateFlow()
 
-    // 初始化 ViewModel，加载任务数据（如果是编辑模式）
     init {
         val taskId = savedStateHandle.get<Long>("taskId") ?: -1L
         if (taskId != -1L) {
@@ -55,7 +55,6 @@ class AddEditTaskViewModel(
         }
     }
 
-    // 加载现有任务数据
     private fun loadTask(id: Long) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -73,7 +72,6 @@ class AddEditTaskViewModel(
         }
     }
 
-    // 更新表单字段
     fun updateTitle(title: String) {
         _title.value = title
     }
@@ -90,27 +88,29 @@ class AddEditTaskViewModel(
         _priority.value = priority
     }
 
-    // 保存任务
     fun saveTask() {
         if (_title.value.isBlank()) return
 
         viewModelScope.launch {
             if (_taskId.value != -1L) {
-                // 更新现有任务
+                // 更新现有任务，保留原有 createdAt 和 isCompleted
+                val oldTask = taskRepository.getTaskById(_taskId.value)
                 val task = Task(
                     id = _taskId.value,
+                    userId = userId,
                     title = _title.value,
                     description = _description.value,
                     dueDate = _dueDate.value,
                     priority = _priority.value,
-                    isCompleted = false, // 保持现有的完成状态
-                    createdAt = LocalDateTime.now(), // 这应该保持原始值，但为了简化示例
+                    isCompleted = oldTask?.isCompleted ?: false,
+                    createdAt = oldTask?.createdAt ?: LocalDateTime.now(),
                     updatedAt = LocalDateTime.now()
                 )
                 taskRepository.updateTask(task)
             } else {
                 // 创建新任务
                 val task = Task(
+                    userId = userId,
                     title = _title.value,
                     description = _description.value,
                     dueDate = _dueDate.value,
@@ -125,23 +125,20 @@ class AddEditTaskViewModel(
         }
     }
 
-    // 重置操作成功状态
     fun resetOperationSuccess() {
         _operationSuccess.value = false
     }
 
-    // ViewModel Factory，用于创建带有参数的ViewModel
     companion object {
-        fun provideFactory(taskId: Long): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+        fun provideFactory(userId: Long, taskId: Long): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as AchieveApp
                 val savedStateHandle = extras.createSavedStateHandle()
-
-                // 将taskId作为参数传递给SavedStateHandle
                 savedStateHandle["taskId"] = taskId
 
                 return AddEditTaskViewModel(
+                    userId = userId,
                     taskRepository = application.taskRepository,
                     savedStateHandle = savedStateHandle
                 ) as T

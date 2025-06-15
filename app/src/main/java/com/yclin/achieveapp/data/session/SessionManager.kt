@@ -20,7 +20,7 @@ class SessionManager(context: Context) {
     // 保存用户信息（登录/注册成功后调用）
     fun saveUser(user: User) {
         prefs.edit()
-            .putLong(KEY_USER_ID, user.id)
+            .putLong(KEY_USER_ID, user.userId)
             .putString(KEY_USERNAME, user.username)
             .putString(KEY_EMAIL, user.email)
             .apply()
@@ -32,7 +32,7 @@ class SessionManager(context: Context) {
         val username = prefs.getString(KEY_USERNAME, null)
         val email = prefs.getString(KEY_EMAIL, null)
         return if (id != -1L && username != null && email != null) {
-            User(id = id, username = username, email = email)
+            User(userId = id, username = username, email = email)
         } else {
             null
         }

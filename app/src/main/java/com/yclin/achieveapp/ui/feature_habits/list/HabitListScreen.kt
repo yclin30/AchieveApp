@@ -7,8 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-// 建议为详情页也添加一个图标，如果不想点击整个卡片的话
-// import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,38 +17,60 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.yclin.achieveapp.data.database.entity.Habit
 import com.yclin.achieveapp.ui.navigation.Screen
-import com.yclin.achieveapp.AchieveApp // 确保引入 AchieveApp
+import com.yclin.achieveapp.AchieveApp
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitListScreen(
     navController: NavController,
-    viewModel: HabitListViewModel = viewModel(
-        factory = HabitListViewModel.Factory(
-            navController.context.applicationContext as AchieveApp // 确保类型转换正确
-        )
-    ),
+    userId: Long,
     modifier: Modifier = Modifier
 ) {
+    val viewModel: HabitListViewModel = viewModel(
+        factory = HabitListViewModel.Factory(
+            navController.context.applicationContext as AchieveApp,
+            userId
+        )
+    )
     val habits by viewModel.habits.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // 监听同步事件并弹出Snackbar
+    LaunchedEffect(Unit) {
+        viewModel.syncEvent.collectLatest { event ->
+            when(event) {
+                is SyncUiEvent.Success -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+                is SyncUiEvent.Error -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("习惯追踪") }
+                title = { Text("习惯追踪") },
+                actions = {
+                    IconButton(onClick = { viewModel.syncHabits() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "同步")
+                    }
+                }
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // 跳转到新增习惯页面，使用 Screen.AddEditHabit.route (不带参数)
-                    // 或者使用 createRoute 传入 null 或 -1L
                     navController.navigate(Screen.AddEditHabit.createRoute(null))
                 }
             ) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "添加习惯")
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Box(
             modifier = modifier
@@ -70,7 +91,7 @@ fun HabitListScreen(
                     items(habits, key = { it.id }) { habit ->
                         HabitItem(
                             habit = habit,
-                            onItemClick = { // 修改这里：整个条目点击进入详情
+                            onItemClick = {
                                 navController.navigate(Screen.HabitDetail.createRoute(habit.id))
                             },
                             onEdit = {
@@ -88,13 +109,13 @@ fun HabitListScreen(
 @Composable
 fun HabitItem(
     habit: Habit,
-    onItemClick: () -> Unit, // 新增参数，用于整个条目点击
+    onItemClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onItemClick  // 点击整个卡片跳转到详情
+        onClick = onItemClick
     ) {
         Row(
             modifier = Modifier
@@ -135,14 +156,12 @@ fun HabitItem(
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            // 编辑按钮
             IconButton(onClick = onEdit) {
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "编辑习惯"
                 )
             }
-            // 删除按钮
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,

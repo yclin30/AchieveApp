@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AddEditHabitViewModel(
+    private val userId: Long,
     private val habitRepository: HabitRepository,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -56,7 +57,7 @@ class AddEditHabitViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val habit = habitRepository.getHabitById(id)
+                val habit = habitRepository.getHabitById(userId, id)
                 habit?.let {
                     _name.value = it.name
                     _description.value = it.description
@@ -94,6 +95,7 @@ class AddEditHabitViewModel(
                 habitRepository.updateHabit(
                     Habit(
                         id = _habitId.value,
+                        userId = userId,
                         name = _name.value,
                         description = _description.value,
                         frequencyType = _frequencyType.value,
@@ -105,6 +107,7 @@ class AddEditHabitViewModel(
                 habitRepository.addHabit(
                     Habit(
                         name = _name.value,
+                        userId = userId,
                         description = _description.value,
                         frequencyType = _frequencyType.value,
                         weekDays = _weekDays.value
@@ -120,16 +123,15 @@ class AddEditHabitViewModel(
     }
 
     companion object {
-        fun provideFactory(habitId: Long): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+        fun provideFactory(userId: Long, habitId: Long): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as AchieveApp
                 val savedStateHandle = extras.createSavedStateHandle()
-
-                // 将habitId作为参数传递给SavedStateHandle
                 savedStateHandle["habitId"] = habitId
 
                 return AddEditHabitViewModel(
+                    userId = userId,
                     habitRepository = application.habitRepository,
                     savedStateHandle = savedStateHandle
                 ) as T

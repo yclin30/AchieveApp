@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -44,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.yclin.achieveapp.data.database.entity.Task
 import com.yclin.achieveapp.ui.navigation.Screen
+import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -72,15 +75,28 @@ fun TaskListScreen(
 ) {
     val tasks by viewModel.tasks.collectAsState()
     val currentFilter by viewModel.filterState.collectAsState()
-
     val snackbarHostState = remember { SnackbarHostState() }
     var showFilterMenu by remember { mutableStateOf(false) }
+
+    // 监听同步事件并弹出Snackbar
+    LaunchedEffect(Unit) {
+        viewModel.syncEvent.collectLatest { event ->
+            when (event) {
+                is SyncUiEvent.Success -> snackbarHostState.showSnackbar(event.message)
+                is SyncUiEvent.Error -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("任务列表") },
                 actions = {
+                    // 刷新/同步按钮
+                    IconButton(onClick = { viewModel.syncTasks() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "同步")
+                    }
                     Box {
                         TextButton(
                             onClick = { showFilterMenu = !showFilterMenu }
@@ -99,7 +115,6 @@ fun TaskListScreen(
                                 contentDescription = "过滤选项"
                             )
                         }
-
                         DropdownMenu(
                             expanded = showFilterMenu,
                             onDismissRequest = { showFilterMenu = false }
@@ -163,10 +178,8 @@ fun TaskListScreen(
             contentAlignment = Alignment.Center
         ) {
             if (tasks.isEmpty()) {
-                // 空状态
                 EmptyTasksMessage(currentFilter)
             } else {
-                // 任务列表
                 TaskList(
                     tasks = tasks,
                     onTaskClick = { task ->

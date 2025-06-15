@@ -129,6 +129,7 @@ class MainActivity : ComponentActivity() {
                                 val application = this@MainActivity.application as AchieveApp
                                 val dashboardViewModel: DashboardViewModel = viewModel(
                                     factory = DashboardViewModel.provideFactory(
+                                        userId = user?.userId ?: -1L,
                                         taskDao = application.database.taskDao(),
                                         habitDao = application.database.habitDao(),
                                         habitCompletionDao = application.database.habitCompletionDao(),
@@ -143,7 +144,7 @@ class MainActivity : ComponentActivity() {
                             // ========== 任务列表 =========
                             composable(Screen.Tasks.route) {
                                 val taskListViewModel: TaskListViewModel = viewModel(
-                                    factory = TaskListViewModel.Factory(application as AchieveApp)
+                                    factory = TaskListViewModel.Factory(application as AchieveApp, user?.userId ?: -1L)
                                 )
                                 TaskListScreen(
                                     navController = navController,
@@ -152,12 +153,13 @@ class MainActivity : ComponentActivity() {
                             }
                             // ========== 习惯列表 =========
                             composable(Screen.Habits.route) {
-                                HabitListScreen(navController = navController)
+                                HabitListScreen(navController = navController,
+                                    userId = user?.userId ?: -1L)
                             }
                             // ========== 添加/编辑任务 =========
                             composable(Screen.AddEditTask.route) {
                                 val addEditTaskViewModel: AddEditTaskViewModel = viewModel(
-                                    factory = AddEditTaskViewModel.provideFactory(-1L)
+                                    factory = AddEditTaskViewModel.provideFactory(userId = user?.userId ?: -1L,-1L)
                                 )
                                 AddEditTaskScreen(
                                     navController = navController,
@@ -175,7 +177,10 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val taskId = backStackEntry.arguments?.getLong("taskId") ?: -1L
                                 val addEditTaskViewModel: AddEditTaskViewModel = viewModel(
-                                    factory = AddEditTaskViewModel.provideFactory(taskId)
+                                    factory = AddEditTaskViewModel.provideFactory(
+                                        userId = user?.userId ?: -1L,
+                                        taskId = taskId
+                                    )
                                 )
                                 AddEditTaskScreen(
                                     navController = navController,
@@ -185,7 +190,7 @@ class MainActivity : ComponentActivity() {
                             // ========== 添加/编辑习惯 =========
                             composable(Screen.AddEditHabit.route) {
                                 val addEditHabitViewModel: AddEditHabitViewModel = viewModel(
-                                    factory = AddEditHabitViewModel.provideFactory(-1L)
+                                    factory = AddEditHabitViewModel.provideFactory(user?.userId ?: -1L, -1L)
                                 )
                                 AddEditHabitScreen(
                                     navController = navController,
@@ -203,7 +208,10 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val habitId = backStackEntry.arguments?.getLong("habitId") ?: -1L
                                 val addEditHabitViewModel: AddEditHabitViewModel = viewModel(
-                                    factory = AddEditHabitViewModel.provideFactory(habitId)
+                                    factory = AddEditHabitViewModel.provideFactory(
+                                        user?.userId ?: -1L,
+                                        habitId
+                                    )
                                 )
                                 AddEditHabitScreen(
                                     navController = navController,
@@ -223,6 +231,7 @@ class MainActivity : ComponentActivity() {
                                 val habitDetailViewModel: HabitDetailViewModel = viewModel(
                                     factory = HabitDetailViewModel.provideFactory(
                                         habitId,
+                                        userId = user?.userId ?: -1L,
                                         application as AchieveApp
                                     )
                                 )

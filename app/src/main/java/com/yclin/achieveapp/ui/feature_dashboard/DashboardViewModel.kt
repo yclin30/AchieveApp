@@ -15,18 +15,18 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
+    private val userId: Long,
     private val taskDao: TaskDao,
     private val habitDao: HabitDao,
     private val habitCompletionDao: HabitCompletionDao,
     private val application: Application
 ) : ViewModel() {
 
-    val todayTasks: StateFlow<List<Task>> = taskDao.getTodayTasksFlow()
+    val todayTasks: StateFlow<List<Task>> = taskDao.getTodayTasksFlow(userId)
         .catch { e ->
             System.err.println("获取今日任务时出错: ${e.message}")
             emit(emptyList<Task>())
@@ -38,30 +38,23 @@ class DashboardViewModel(
         )
 
     val todayHabits: StateFlow<List<HabitDashboardItem>> = flow { emit(LocalDate.now(ZoneOffset.UTC)) }
-        .flatMapLatest { date -> // date 是今天的日期
-            val todayBit = 1 shl (date.dayOfWeek.value - 1)
-            habitDao.getHabitsForTodayFlow(todayBit) // 这个返回 Flow<List<Habit>>
+        .flatMapLatest { date ->
+            val todayBit = 1 shl (date.dayOfWeek.value - 1) // Int 类型
+            habitDao.getHabitsForTodayFlow(userId, todayBit)
                 .catch { e ->
                     System.err.println("获取今日习惯时出错: ${e.message}")
                     emit(emptyList<Habit>())
                 }
-                .map { habitsList -> // *** 修改点: 这里用 Flow 的 map 操作 habitsList (List<Habit>) ***
-                    // 现在 habitsList 是一个 List<Habit>
-                    // 我们需要为这个列表中的每个 habit 获取其完成状态
-                    // 这将是一个 List<HabitDashboardItem>
+                .map { habitsList ->
                     if (habitsList.isEmpty()) {
                         emptyList<HabitDashboardItem>()
                     } else {
-                        // 使用 List 的 map (非 Flow 的 map) 来转换每个 habit
-                        // 假设 getCompletionByDate 是 suspend fun
+                        val habitIds = habitsList.map { it.id }
+                        // 你需要在 HabitCompletionDao 实现 getCompletionsByHabitIdsAndDate
+                        val completions = habitCompletionDao.getCompletionsByHabitIdsAndDate(habitIds, date)
+                        val completedMap = completions.associateBy { it.habitId }
                         habitsList.map { habit ->
-                            try {
-                                val completion = habitCompletionDao.getCompletionByDate(habit.id, date) // suspend call
-                                HabitDashboardItem(habit, completion != null, date)
-                            } catch (e: Exception) {
-                                System.err.println("获取习惯 ${habit.id} 的完成状态时出错 (内部 map): ${e.message}")
-                                HabitDashboardItem(habit, false, date) // 出错时默认未完成
-                            }
+                            HabitDashboardItem(habit, completedMap.containsKey(habit.id), date)
                         }
                     }
                 }
@@ -69,7 +62,7 @@ class DashboardViewModel(
 
     fun toggleHabitCompletion(habitId: Long, date: LocalDate, isCurrentlyCompleted: Boolean) {
         viewModelScope.launch {
-            val habit = habitDao.getHabitById(habitId)
+            val habit = habitDao.getHabitById(habitId, userId)
             if (habit == null) {
                 System.err.println("切换习惯完成状态时未找到习惯: $habitId")
                 return@launch
@@ -96,7 +89,12 @@ class DashboardViewModel(
 
         if (allCompletionDatesForHabit.isEmpty()) {
             if (habitToUpdate.currentStreak != 0) {
-                habitDao.updateHabitStreaks(habitToUpdate.id, 0, habitToUpdate.longestStreak)
+                habitDao.updateHabitStreaks(
+                    habitId = habitToUpdate.id,
+                    userId = userId,
+                    currentStreak = 0,
+                    longestStreak = habitToUpdate.longestStreak
+                )
             }
             return
         }
@@ -109,12 +107,18 @@ class DashboardViewModel(
         )
         val finalLongestStreak = maxOf(calculatedLongestStreak, habitToUpdate.longestStreak)
         if (habitToUpdate.currentStreak != newCurrentStreak || habitToUpdate.longestStreak != finalLongestStreak) {
-            habitDao.updateHabitStreaks(habitToUpdate.id, newCurrentStreak, finalLongestStreak)
+            habitDao.updateHabitStreaks(
+                habitId = habitToUpdate.id,
+                userId = userId,
+                currentStreak = newCurrentStreak,
+                longestStreak = finalLongestStreak
+            )
         }
     }
 
     companion object {
         fun provideFactory(
+            userId: Long,
             taskDao: TaskDao,
             habitDao: HabitDao,
             habitCompletionDao: HabitCompletionDao,
@@ -124,7 +128,7 @@ class DashboardViewModel(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
-                        return DashboardViewModel(taskDao, habitDao, habitCompletionDao, application) as T
+                        return DashboardViewModel(userId, taskDao, habitDao, habitCompletionDao, application) as T
                     }
                     throw IllegalArgumentException("未知的 ViewModel 类: ${modelClass.name}")
                 }

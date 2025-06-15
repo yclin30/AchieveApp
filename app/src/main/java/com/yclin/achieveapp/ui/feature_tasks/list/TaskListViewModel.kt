@@ -6,17 +6,20 @@ import androidx.lifecycle.viewModelScope
 import com.yclin.achieveapp.AchieveApp
 import com.yclin.achieveapp.data.database.entity.Task
 import com.yclin.achieveapp.data.repository.TaskRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 
+// 同步通知事件
+sealed class SyncUiEvent {
+    data class Success(val message: String): SyncUiEvent()
+    data class Error(val message: String): SyncUiEvent()
+}
+
 class TaskListViewModel(
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val userId: Long
 ) : ViewModel() {
 
     // 过滤器状态
@@ -25,7 +28,7 @@ class TaskListViewModel(
 
     // 任务列表状态
     val tasks: StateFlow<List<Task>> = combine(
-        taskRepository.getAllTasks(),
+        taskRepository.getAllTasks(userId),
         filterState
     ) { tasks, filter ->
         when (filter) {
@@ -44,6 +47,10 @@ class TaskListViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    // 同步事件流
+    private val _syncEvent = MutableSharedFlow<SyncUiEvent>()
+    val syncEvent: SharedFlow<SyncUiEvent> = _syncEvent.asSharedFlow()
 
     // 设置过滤器
     fun setFilter(filter: TaskFilter) {
@@ -69,12 +76,27 @@ class TaskListViewModel(
         }
     }
 
+    // 同步任务（示例：与云端同步）
+    fun syncTasks() {
+        viewModelScope.launch {
+            try {
+                taskRepository.syncTasks(userId)
+                _syncEvent.emit(SyncUiEvent.Success("同步成功"))
+            } catch (e: Exception) {
+                _syncEvent.emit(SyncUiEvent.Error("同步失败: ${e.message ?: "未知错误"}"))
+            }
+        }
+    }
+
     // ViewModel Factory，用于创建ViewModel实例
-    class Factory(private val application: AchieveApp) : ViewModelProvider.Factory {
+    class Factory(
+        private val application: AchieveApp,
+        private val userId: Long
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TaskListViewModel::class.java)) {
-                return TaskListViewModel(application.taskRepository) as T
+                return TaskListViewModel(application.taskRepository, userId) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

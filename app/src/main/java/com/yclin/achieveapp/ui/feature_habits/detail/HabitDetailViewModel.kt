@@ -15,11 +15,12 @@ import java.time.LocalDate
 
 class HabitDetailViewModel(
     private val habitRepository: HabitRepository,
-    private val habitId: Long
+    private val habitId: Long,
+    private val userId: Long // 多用户隔离
 ) : ViewModel() {
 
     val habitWithCompletions: StateFlow<HabitWithCompletions?> =
-        habitRepository.getHabitWithCompletions(habitId)
+        habitRepository.getHabitWithCompletions(habitId, userId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _selectedDate = MutableStateFlow(LocalDate.now())
@@ -35,23 +36,24 @@ class HabitDetailViewModel(
 
     fun toggleCompletion(date: LocalDate) {
         viewModelScope.launch {
-            val completed = habitRepository.isHabitCompletedOnDate(habitId, date)
+            val completed = habitRepository.isHabitCompletedOnDate(habitId, date, userId)
             if (completed) {
-                habitRepository.uncompleteHabit(habitId, date)
+                habitRepository.uncompleteHabit(habitId, date, userId)
             } else {
-                habitRepository.completeHabit(habitId, date)
+                habitRepository.completeHabit(habitId, date, userId)
             }
         }
     }
 
     companion object {
-        fun provideFactory(habitId: Long, application: AchieveApp): ViewModelProvider.Factory =
+        fun provideFactory(habitId: Long, userId: Long, application: AchieveApp): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     return HabitDetailViewModel(
                         habitRepository = application.habitRepository,
-                        habitId = habitId
+                        habitId = habitId,
+                        userId = userId
                     ) as T
                 }
             }

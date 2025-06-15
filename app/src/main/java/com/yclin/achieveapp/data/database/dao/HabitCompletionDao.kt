@@ -111,4 +111,13 @@ interface HabitCompletionDao {
         LIMIT 1
     """)
     suspend fun getLastCompletionDate(habitId: Long): LocalDate?
+
+    /**
+     * 批量获取指定日期这些习惯的完成记录
+     * @param habitIds 习惯ID列表
+     * @param date 日期
+     * @return 这些习惯在该日期的完成记录
+     */
+    @Query("SELECT * FROM habit_completions WHERE habitId IN (:habitIds) AND date = :date")
+    suspend fun getCompletionsByHabitIdsAndDate(habitIds: List<Long>, date: LocalDate): List<HabitCompletion>
 }

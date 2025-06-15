@@ -12,6 +12,7 @@ data class Habit(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
 
+    val userId: Long = 0L, // 关联的用户ID，默认为0表示未关联
     // 习惯名称
     val name: String,
 

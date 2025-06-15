@@ -12,6 +12,8 @@ import java.time.LocalDateTime
 data class Task(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val userId: Long = 0L, // 关联的用户ID，默认为0表示未关联
+
 
     // 任务标题
     val title: String,
