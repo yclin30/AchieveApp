@@ -2,89 +2,157 @@ package com.yclin.achieveapp.data.repository
 
 import com.yclin.achieveapp.data.database.dao.TaskDao
 import com.yclin.achieveapp.data.database.entity.Task
+import com.yclin.achieveapp.data.database.entity.QuadrantType
 import com.yclin.achieveapp.data.network.api.JsonServerApi
-import com.yclin.achieveapp.data.network.model.RemoteTask
 import com.yclin.achieveapp.data.network.model.toRemoteTask
 import com.yclin.achieveapp.data.network.model.toTask
 import kotlinx.coroutines.flow.Flow
-import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
 interface TaskRepository {
+    // 基础查询
     fun getAllTasks(userId: Long): Flow<List<Task>>
     fun getIncompleteTasks(userId: Long): Flow<List<Task>>
     fun getCompletedTasks(userId: Long): Flow<List<Task>>
-    fun getTodayTasks(userId: Long): Flow<List<Task>>
-    fun getOverdueTasks(userId: Long): Flow<List<Task>>
-    fun getTasksByDueDate(userId: Long, date: LocalDate): Flow<List<Task>>
-    fun getTasksByPriority(userId: Long, priority: Int): Flow<List<Task>>
+
+    // 四象限查询
+    fun getUrgentAndImportantTasks(userId: Long): Flow<List<Task>>
+    fun getImportantNotUrgentTasks(userId: Long): Flow<List<Task>>
+    fun getUrgentNotImportantTasks(userId: Long): Flow<List<Task>>
+    fun getNotUrgentNotImportantTasks(userId: Long): Flow<List<Task>>
+
+    // 任务操作
     suspend fun getTaskById(taskId: Long): Task?
     suspend fun addTask(task: Task): Long
     suspend fun updateTask(task: Task)
-    suspend fun deleteTask(task: Task)       // 变为软删除
+    suspend fun deleteTask(task: Task)
     suspend fun setTaskCompleted(taskId: Long, completed: Boolean)
+    suspend fun moveTaskToQuadrant(taskId: Long, quadrant: QuadrantType)
 
     // 同步相关
     suspend fun syncTasksFromRemote(userId: Long)
     suspend fun syncTaskToRemote(task: Task)
-    suspend fun syncDeleteTaskRemote(task: Task)
     suspend fun safeSyncTasksToCloud(userId: Long)
 }
+
 @Singleton
 class TaskRepositoryImpl @Inject constructor(
     private val taskDao: TaskDao,
     private val api: JsonServerApi
 ) : TaskRepository {
 
-    override fun getAllTasks(userId: Long): Flow<List<Task>> = taskDao.getAllTasksFlow(userId)
-    override fun getIncompleteTasks(userId: Long): Flow<List<Task>> = taskDao.getIncompleteTasksFlow(userId)
-    override fun getCompletedTasks(userId: Long): Flow<List<Task>> = taskDao.getCompletedTasksFlow(userId)
-    override fun getTodayTasks(userId: Long): Flow<List<Task>> = taskDao.getTodayTasksFlow(userId)
-    override fun getOverdueTasks(userId: Long): Flow<List<Task>> = taskDao.getOverdueTasksFlow(userId)
-    override fun getTasksByDueDate(userId: Long, date: LocalDate): Flow<List<Task>> =
-        taskDao.getTasksByDueDateFlow(userId, date)
-    override fun getTasksByPriority(userId: Long, priority: Int): Flow<List<Task>> =
-        taskDao.getTasksByPriorityFlow(userId, priority)
-    override suspend fun getTaskById(taskId: Long): Task? = taskDao.getTaskById(taskId)
+    private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+
+    // 基础查询
+    override fun getAllTasks(userId: Long): Flow<List<Task>> =
+        taskDao.getAllTasksFlow(userId)
+
+    override fun getIncompleteTasks(userId: Long): Flow<List<Task>> =
+        taskDao.getIncompleteTasksFlow(userId)
+
+    override fun getCompletedTasks(userId: Long): Flow<List<Task>> =
+        taskDao.getCompletedTasksFlow(userId)
+
+    // 四象限查询
+    override fun getUrgentAndImportantTasks(userId: Long): Flow<List<Task>> =
+        taskDao.getUrgentAndImportantTasksFlow(userId)
+
+    override fun getImportantNotUrgentTasks(userId: Long): Flow<List<Task>> =
+        taskDao.getImportantNotUrgentTasksFlow(userId)
+
+    override fun getUrgentNotImportantTasks(userId: Long): Flow<List<Task>> =
+        taskDao.getUrgentNotImportantTasksFlow(userId)
+
+    override fun getNotUrgentNotImportantTasks(userId: Long): Flow<List<Task>> =
+        taskDao.getNotUrgentNotImportantTasksFlow(userId)
+
+    // 任务操作
+    override suspend fun getTaskById(taskId: Long): Task? =
+        taskDao.getTaskById(taskId)
 
     override suspend fun addTask(task: Task): Long {
-        val id = taskDao.insertTask(task)
+        val currentTime = LocalDateTime.now().format(dateTimeFormatter)
+        val taskWithTime = task.copy(
+            createdAt = LocalDateTime.now(),
+            updatedAt = LocalDateTime.now()
+        )
+        val id = taskDao.insertTask(taskWithTime)
+
+        // 异步同步到云端
         try {
-            syncTaskToRemote(task.copy(id = id))
-        } catch (_: Exception) { }
+            syncTaskToRemote(taskWithTime.copy(id = id))
+        } catch (_: Exception) {
+            // 同步失败不影响本地操作
+        }
+
         return id
     }
 
     override suspend fun updateTask(task: Task) {
-        taskDao.updateTask(task)
+        val taskWithTime = task.copy(updatedAt = LocalDateTime.now())
+        taskDao.updateTask(taskWithTime)
+
         try {
-            syncTaskToRemote(task)
-        } catch (_: Exception) {}
+            syncTaskToRemote(taskWithTime)
+        } catch (_: Exception) {
+            // 同步失败不影响本地操作
+        }
     }
 
-    // 软删除
     override suspend fun deleteTask(task: Task) {
-        taskDao.markTaskDeleted(task.id, task.userId)
-        // 不立即物理删除
+        val currentTime = LocalDateTime.now().format(dateTimeFormatter)
+        taskDao.markTaskDeleted(task.id, task.userId, currentTime)
     }
 
     override suspend fun setTaskCompleted(taskId: Long, completed: Boolean) {
-        taskDao.setTaskCompleted(taskId, completed)
-        // 可选：同步到云端
+        val currentTime = LocalDateTime.now().format(dateTimeFormatter)
+        taskDao.setTaskCompleted(taskId, completed, currentTime)
     }
 
-    // ========== 同步相关 ==========
+    override suspend fun moveTaskToQuadrant(taskId: Long, quadrant: QuadrantType) {
+        val currentTime = LocalDateTime.now().format(dateTimeFormatter)
+        when (quadrant) {
+            QuadrantType.URGENT_IMPORTANT -> {
+                taskDao.moveTaskToQuadrant(taskId, true, true, currentTime)
+            }
+            QuadrantType.IMPORTANT_NOT_URGENT -> {
+                taskDao.moveTaskToQuadrant(taskId, true, false, currentTime)
+            }
+            QuadrantType.URGENT_NOT_IMPORTANT -> {
+                taskDao.moveTaskToQuadrant(taskId, false, true, currentTime)
+            }
+            QuadrantType.NOT_URGENT_NOT_IMPORTANT -> {
+                taskDao.moveTaskToQuadrant(taskId, false, false, currentTime)
+            }
+        }
 
+        // 同步移动操作
+        try {
+            val task = taskDao.getTaskById(taskId)
+            task?.let { syncTaskToRemote(it) }
+        } catch (_: Exception) {
+            // 同步失败不影响本地操作
+        }
+    }
+
+    // 同步方法（简化实现）
     override suspend fun syncTasksFromRemote(userId: Long) {
-        val remoteTasks = api.getTasks(userId).map { it.toTask() }
-        if (remoteTasks.isEmpty()) return
-        taskDao.replaceAllTasksByUser(userId, remoteTasks)
+        try {
+            val remoteTasks = api.getTasks(userId).map { it.toTask() }
+            if (remoteTasks.isNotEmpty()) {
+                taskDao.replaceAllTasksByUser(userId, remoteTasks)
+            }
+        } catch (e: Exception) {
+            throw e
+        }
     }
 
     override suspend fun syncTaskToRemote(task: Task) {
-        val remoteTask = task.toRemoteTask()
         try {
+            val remoteTask = task.toRemoteTask()
             if (remoteTask.id == 0L) {
                 api.addTask(remoteTask)
             } else {
@@ -98,32 +166,36 @@ class TaskRepositoryImpl @Inject constructor(
                     }
                 }
             }
-        } catch (e: Exception) {}
-    }
-
-    override suspend fun syncDeleteTaskRemote(task: Task) {
-        try {
-            if (task.id != 0L) {
-                api.deleteTask(task.id)
-            }
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            throw e
+        }
     }
 
     override suspend fun safeSyncTasksToCloud(userId: Long) {
-        // 1. 先同步本地已删除的任务到云端
+        // 同步已删除的任务
         val deletedTasks = taskDao.getAllDeletedTasks(userId)
         for (task in deletedTasks) {
             try {
-                syncDeleteTaskRemote(task)
-            } catch (_: Exception) {}
-            // 可选：同步后本地物理删除
-            // taskDao.deleteTask(task)
+                if (task.id != 0L) {
+                    api.deleteTask(task.id)
+                }
+            } catch (_: Exception) {
+                // 忽略删除失败
+            }
         }
-        // 2. 再同步未删除的任务到云端
+
+        // 同步未删除的任务
         val notDeletedTasks = taskDao.getAllNotDeletedTasks(userId)
         for (task in notDeletedTasks) {
-            syncTaskToRemote(task)
+            try {
+                syncTaskToRemote(task)
+            } catch (_: Exception) {
+                // 继续同步其他任务
+            }
         }
+
+        // 清理已删除的任务
+        taskDao.deletePhysicallyDeletedTasks(userId)
     }
 
     private fun isNotFoundError(e: Exception): Boolean {

@@ -17,7 +17,7 @@ import com.yclin.achieveapp.data.database.entity.Task
  */
 @Database(
     entities = [Task::class, Habit::class, HabitCompletion::class],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

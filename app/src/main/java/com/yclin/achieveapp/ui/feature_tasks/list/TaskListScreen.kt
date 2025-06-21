@@ -1,56 +1,17 @@
 package com.yclin.achieveapp.ui.feature_tasks.list
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.yclin.achieveapp.data.database.entity.Task
+import com.yclin.achieveapp.data.database.entity.QuadrantType
 import com.yclin.achieveapp.ui.navigation.Screen
 import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDate
@@ -73,12 +35,17 @@ fun TaskListScreen(
     viewModel: TaskListViewModel,
     modifier: Modifier = Modifier
 ) {
-    val tasks by viewModel.tasks.collectAsState()
-    val currentFilter by viewModel.filterState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var showFilterMenu by remember { mutableStateOf(false) }
+    val urgentImportantTasks by viewModel.urgentAndImportantTasks.collectAsState()
+    val importantNotUrgentTasks by viewModel.importantNotUrgentTasks.collectAsState()
+    val urgentNotImportantTasks by viewModel.urgentNotImportantTasks.collectAsState()
+    val notUrgentNotImportantTasks by viewModel.notUrgentNotImportantTasks.collectAsState()
+    val showCompleted by viewModel.showCompleted.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val taskStats by viewModel.getTaskStats().collectAsState()
 
-    // 监听同步事件并弹出Snackbar
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // 监听同步事件
     LaunchedEffect(Unit) {
         viewModel.syncEvent.collectLatest { event ->
             when (event) {
@@ -91,70 +58,40 @@ fun TaskListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("任务列表") },
-                actions = {
-                    // 刷新/同步按钮
-                    IconButton(onClick = { viewModel.syncTasks() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "同步")
-                    }
-
-                    Box {
-                        TextButton(
-                            onClick = { showFilterMenu = !showFilterMenu }
-                        ) {
+                title = {
+                    Column {
+                        Text("四象限任务管理")
+                        if (taskStats.totalActiveTasks > 0) {
                             Text(
-                                text = when (currentFilter) {
-                                    TaskFilter.ALL -> "全部任务"
-                                    TaskFilter.ACTIVE -> "进行中"
-                                    TaskFilter.COMPLETED -> "已完成"
-                                    TaskFilter.TODAY -> "今天"
-                                    TaskFilter.OVERDUE -> "逾期"
-                                }
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = "过滤选项"
+                                text = "${taskStats.totalActiveTasks} 个活跃任务",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                         }
-                        DropdownMenu(
-                            expanded = showFilterMenu,
-                            onDismissRequest = { showFilterMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("全部任务") },
-                                onClick = {
-                                    viewModel.setFilter(TaskFilter.ALL)
-                                    showFilterMenu = false
-                                }
+                    }
+                },
+                actions = {
+                    // 显示/隐藏已完成任务
+                    IconButton(onClick = { viewModel.toggleShowCompleted() }) {
+                        Icon(
+                            imageVector = if (showCompleted) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (showCompleted) "隐藏已完成" else "显示已完成",
+                            tint = if (showCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+
+                    // 同步按钮
+                    IconButton(
+                        onClick = { viewModel.syncTasks() },
+                        enabled = !isLoading
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
                             )
-                            DropdownMenuItem(
-                                text = { Text("进行中") },
-                                onClick = {
-                                    viewModel.setFilter(TaskFilter.ACTIVE)
-                                    showFilterMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("已完成") },
-                                onClick = {
-                                    viewModel.setFilter(TaskFilter.COMPLETED)
-                                    showFilterMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("今天") },
-                                onClick = {
-                                    viewModel.setFilter(TaskFilter.TODAY)
-                                    showFilterMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("逾期") },
-                                onClick = {
-                                    viewModel.setFilter(TaskFilter.OVERDUE)
-                                    showFilterMenu = false
-                                }
-                            )
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "同步")
                         }
                     }
                 }
@@ -164,33 +101,93 @@ fun TaskListScreen(
             FloatingActionButton(
                 onClick = { navController.navigate(Screen.AddEditTask.route) }
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "添加任务"
-                )
+                Icon(Icons.Default.Add, contentDescription = "添加任务")
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
+                .padding(innerPadding)
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (tasks.isEmpty()) {
-                EmptyTasksMessage(currentFilter)
-            } else {
-                TaskList(
-                    tasks = tasks,
+            // 四象限说明卡片
+            QuadrantInfoCard()
+
+            // 第一行：重要且紧急 | 重要不紧急
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                QuadrantCard(
+                    modifier = Modifier.weight(1f),
+                    quadrant = QuadrantType.URGENT_IMPORTANT,
+                    tasks = urgentImportantTasks,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    borderColor = MaterialTheme.colorScheme.error,
                     onTaskClick = { task ->
                         navController.navigate(Screen.AddEditTask.createRoute(task.id))
                     },
-                    onTaskCompleteToggle = { task ->
-                        viewModel.toggleTaskCompleted(task)
+                    onTaskAction = { action ->
+                        viewModel.handleTaskAction(action)
+                    }
+                )
+
+                QuadrantCard(
+                    modifier = Modifier.weight(1f),
+                    quadrant = QuadrantType.IMPORTANT_NOT_URGENT,
+                    tasks = importantNotUrgentTasks,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    borderColor = MaterialTheme.colorScheme.primary,
+                    onTaskClick = { task ->
+                        navController.navigate(Screen.AddEditTask.createRoute(task.id))
                     },
-                    onDeleteTask = { task ->
-                        viewModel.deleteTask(task)
+                    onTaskAction = { action ->
+                        viewModel.handleTaskAction(action)
+                    }
+                )
+            }
+
+            // 第二行：紧急不重要 | 不紧急不重要
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                QuadrantCard(
+                    modifier = Modifier.weight(1f),
+                    quadrant = QuadrantType.URGENT_NOT_IMPORTANT,
+                    tasks = urgentNotImportantTasks,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    borderColor = MaterialTheme.colorScheme.tertiary,
+                    onTaskClick = { task ->
+                        navController.navigate(Screen.AddEditTask.createRoute(task.id))
+                    },
+                    onTaskAction = { action ->
+                        viewModel.handleTaskAction(action)
+                    }
+                )
+
+                QuadrantCard(
+                    modifier = Modifier.weight(1f),
+                    quadrant = QuadrantType.NOT_URGENT_NOT_IMPORTANT,
+                    tasks = notUrgentNotImportantTasks,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    borderColor = MaterialTheme.colorScheme.outline,
+                    onTaskClick = { task ->
+                        navController.navigate(Screen.AddEditTask.createRoute(task.id))
+                    },
+                    onTaskAction = { action ->
+                        viewModel.handleTaskAction(action)
                     }
                 )
             }
@@ -199,195 +196,391 @@ fun TaskListScreen(
 }
 
 @Composable
-fun TaskList(
-    tasks: List<Task>,
-    onTaskClick: (Task) -> Unit,
-    onTaskCompleteToggle: (Task) -> Unit,
-    onDeleteTask: (Task) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(
-            items = tasks,
-            key = { task -> task.id }
-        ) { task ->
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it * 2 }),
-                exit = fadeOut() + slideOutVertically(targetOffsetY = { it * 2 })
-            ) {
-                TaskItem(
-                    task = task,
-                    onTaskClick = onTaskClick,
-                    onTaskCompleteToggle = onTaskCompleteToggle,
-                    onDeleteTask = onDeleteTask
-                )
-            }
-        }
-        // 添加底部间距
-        item { Spacer(modifier = Modifier.height(80.dp)) }
-    }
-}
-
-@Composable
-fun TaskItem(
-    task: Task,
-    onTaskClick: (Task) -> Unit,
-    onTaskCompleteToggle: (Task) -> Unit,
-    onDeleteTask: (Task) -> Unit,
+fun QuadrantInfoCard(
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(8.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 完成状态切换按钮
-            IconButton(
-                onClick = { onTaskCompleteToggle(task) },
-                modifier = Modifier.size(48.dp)
+            Text(
+                text = "重要 ↑",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = "四象限时间管理法",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = "→ 紧急",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun QuadrantCard(
+    quadrant: QuadrantType,
+    tasks: List<Task>,
+    containerColor: Color,
+    contentColor: Color,
+    borderColor: Color,
+    onTaskClick: (Task) -> Unit,
+    onTaskAction: (TaskAction) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showMoveDialog by remember { mutableStateOf<Task?>(null) }
+
+    Card(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(12.dp))
+            .background(containerColor),
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp)
+        ) {
+            // 象限标题和任务计数
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (task.isCompleted)
-                        Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                    contentDescription = if (task.isCompleted) "标记为未完成" else "标记为已完成",
-                    tint = if (task.isCompleted)
-                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = quadrant.displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = quadrant.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = contentColor.copy(alpha = 0.7f)
+                    )
+                }
+
+                // 任务计数徽章
+                if (tasks.isNotEmpty()) {
+                    val activeTasks = tasks.count { !it.isCompleted }
+                    if (activeTasks > 0) {
+                        Badge(
+                            containerColor = borderColor,
+                            contentColor = Color.White
+                        ) {
+                            Text(
+                                text = activeTasks.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
 
-            // 任务内容
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onTaskClick(task) }
-                    .padding(horizontal = 8.dp)
-            ) {
-                // 任务标题
-                Text(
-                    text = task.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                    color = if (task.isCompleted)
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    else MaterialTheme.colorScheme.onSurface
-                )
+            Spacer(modifier = Modifier.height(8.dp))
 
-                // 任务描述（如果有）
-                if (task.description.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+            // 任务列表
+            if (tasks.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TaskAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = contentColor.copy(alpha = 0.3f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "暂无任务",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = contentColor.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(
+                        items = tasks,
+                        key = { it.id }
+                    ) { task ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
+                            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 4 })
+                        ) {
+                            QuadrantTaskItem(
+                                task = task,
+                                onClick = { onTaskClick(task) },
+                                onToggleCompleted = {
+                                    onTaskAction(TaskAction.ToggleCompleted(task.id))
+                                },
+                                onDelete = {
+                                    onTaskAction(TaskAction.DeleteTask(task.id))
+                                },
+                                onMove = {
+                                    showMoveDialog = task
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 移动任务对话框
+    showMoveDialog?.let { task ->
+        MoveTaskDialog(
+            task = task,
+            currentQuadrant = quadrant,
+            onDismiss = { showMoveDialog = null },
+            onMove = { targetQuadrant ->
+                onTaskAction(TaskAction.MoveTask(task.id, targetQuadrant))
+                showMoveDialog = null
+            }
+        )
+    }
+}
+
+@Composable
+fun QuadrantTaskItem(
+    task: Task,
+    onClick: () -> Unit,
+    onToggleCompleted: () -> Unit,
+    onDelete: () -> Unit,
+    onMove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                // 完成状态切换
+                IconButton(
+                    onClick = onToggleCompleted,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = if (task.isCompleted) "标记为未完成" else "标记为已完成",
+                        tint = if (task.isCompleted)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // 任务内容
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
-                        text = task.description,
+                        text = task.title,
                         style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                        color = if (task.isCompleted)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        else MaterialTheme.colorScheme.onSurface
                     )
-                }
 
-                // 截止日期（如果有）
-                if (task.dueDate != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val isOverdue = task.dueDate.isBefore(LocalDate.now()) && !task.isCompleted
-                    val dateColor = when {
-                        task.isCompleted -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        isOverdue -> MaterialTheme.colorScheme.error
-                        task.dueDate == LocalDate.now() -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    }
-
-                    Text(
-                        text = "截止日期: ${task.dueDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = dateColor
-                    )
-                }
-
-                // 优先级指示器（如果设置了优先级）
-                if (task.priority > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val priorityColor = when (task.priority) {
-                            1 -> Color.Red.copy(alpha = 0.8f)
-                            2 -> Color(0xFFFFA500) // Orange
-                            else -> Color(0xFF4CAF50) // Green
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(priorityColor)
-                        )
-
-                        Spacer(modifier = Modifier.width(4.dp))
-
+                    // 描述（如果有）
+                    if (task.description.isNotBlank()) {
                         Text(
-                            text = when (task.priority) {
-                                1 -> "高优先级"
-                                2 -> "中优先级"
-                                else -> "低优先级"
-                            },
+                            text = task.description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+
+                    // 截止日期
+                    if (task.dueDate != null) {
+                        val isOverdue = task.dueDate.isBefore(LocalDate.now()) && !task.isCompleted
+                        val isToday = task.dueDate == LocalDate.now()
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = when {
+                                    task.isCompleted -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    isOverdue -> MaterialTheme.colorScheme.error
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = task.dueDate.format(DateTimeFormatter.ofPattern("MM-dd")),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = when {
+                                    task.isCompleted -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    isOverdue -> MaterialTheme.colorScheme.error
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // 菜单按钮
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "更多选项",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("移动到...") },
+                            onClick = {
+                                onMove()
+                                showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.DriveFileMove, contentDescription = null)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除") },
+                            onClick = {
+                                onDelete()
+                                showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         )
                     }
                 }
-            }
-
-            // 删除按钮
-            IconButton(
-                onClick = { onDeleteTask(task) }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "删除任务",
-                    tint = MaterialTheme.colorScheme.error
-                )
             }
         }
     }
 }
 
 @Composable
-fun EmptyTasksMessage(filter: TaskFilter) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = when (filter) {
-                TaskFilter.ALL -> "没有任务"
-                TaskFilter.ACTIVE -> "没有进行中的任务"
-                TaskFilter.COMPLETED -> "没有已完成的任务"
-                TaskFilter.TODAY -> "今天没有待办任务"
-                TaskFilter.OVERDUE -> "没有逾期任务"
-            },
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
+fun MoveTaskDialog(
+    task: Task,
+    currentQuadrant: QuadrantType,
+    onDismiss: () -> Unit,
+    onMove: (QuadrantType) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("移动任务") },
+        text = {
+            Column {
+                Text("将「${task.title}」移动到：")
+                Spacer(modifier = Modifier.height(16.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "点击下方的 + 按钮添加新任务",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-        )
-    }
+                QuadrantType.values().forEach { quadrant ->
+                    if (quadrant != currentQuadrant) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onMove(quadrant) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = quadrant.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = quadrant.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

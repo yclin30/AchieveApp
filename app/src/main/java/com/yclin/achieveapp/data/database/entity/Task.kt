@@ -6,35 +6,52 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
- * 任务实体类，表示用户需要完成的一次性任务
+ * 任务实体类，支持四象限管理（重要性 x 紧急性）
  */
 @Entity(tableName = "tasks")
 data class Task(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val userId: Long = 0L, // 关联的用户ID，默认为0表示未关联
+    val userId: Long = 0L,
 
-
-    // 任务标题
+    // 基本信息
     val title: String,
-
-    // 任务描述（可选）
     val description: String = "",
-
-    // 截止日期（可选）
     val dueDate: LocalDate? = null,
 
-    // 优先级（1-高，2-中，3-低，0-无）
-    val priority: Int = 0,
+    // 四象限分类
+    val isImportant: Boolean = false,  // 是否重要
+    val isUrgent: Boolean = false,     // 是否紧急
 
-    // 任务是否已完成
+    // 状态
     val isCompleted: Boolean = false,
+    val deleted: Boolean = false,
 
-    // 创建时间
+    // 时间戳
     val createdAt: LocalDateTime = LocalDateTime.now(),
+    val updatedAt: LocalDateTime = LocalDateTime.now()
+) {
+    /**
+     * 获取任务所属的象限
+     */
+    val quadrant: QuadrantType
+        get() = when {
+            isImportant && isUrgent -> QuadrantType.URGENT_IMPORTANT
+            isImportant && !isUrgent -> QuadrantType.IMPORTANT_NOT_URGENT
+            !isImportant && isUrgent -> QuadrantType.URGENT_NOT_IMPORTANT
+            else -> QuadrantType.NOT_URGENT_NOT_IMPORTANT
+        }
+}
 
-    // 最后修改时间
-    val updatedAt: LocalDateTime = LocalDateTime.now(),
-
-    val deleted: Boolean = false // 新增
-)
+/**
+ * 四象限类型枚举
+ */
+enum class QuadrantType(
+    val displayName: String,
+    val description: String
+) {
+    URGENT_IMPORTANT("重要且紧急", "危机处理，立即行动"),
+    IMPORTANT_NOT_URGENT("重要不紧急", "计划安排，重点投入"),
+    URGENT_NOT_IMPORTANT("紧急不重要", "减少干扰，学会拒绝"),
+    NOT_URGENT_NOT_IMPORTANT("不重要不紧急", "娱乐放松，适度即可")
+}
