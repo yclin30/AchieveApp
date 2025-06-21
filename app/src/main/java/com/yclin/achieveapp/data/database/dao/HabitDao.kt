@@ -67,4 +67,15 @@ interface HabitDao {
     }
     @Query("SELECT * FROM habits WHERE userId = :userId AND deleted = 0 ORDER BY name ASC")
     suspend fun getAllNotDeletedHabits(userId: Long): List<Habit>
+
+    // 在 HabitDao 中添加以下方法：
+
+    @Query("""
+    SELECT * FROM habits 
+    WHERE userId = :userId 
+    AND (name LIKE :query OR description LIKE :query)
+    AND deleted = 0
+    ORDER BY name ASC
+""")
+    fun searchHabitsFlow(userId: Long, query: String): Flow<List<Habit>>
 }

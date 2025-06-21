@@ -129,4 +129,25 @@ interface TaskDao {
             insertAllTasks(newTasks)
         }
     }
+
+    @Query("""
+    SELECT * FROM tasks 
+    WHERE userId = :userId 
+    AND (title LIKE :query OR description LIKE :query)
+    AND deleted = 0
+    ORDER BY 
+        CASE WHEN isCompleted THEN 1 ELSE 0 END,
+        title ASC
+""")
+    fun searchAllTasksFlow(userId: Long, query: String): Flow<List<Task>>
+
+    @Query("""
+    SELECT * FROM tasks 
+    WHERE userId = :userId 
+    AND (title LIKE :query OR description LIKE :query)
+    AND isCompleted = 0 
+    AND deleted = 0
+    ORDER BY title ASC
+""")
+    fun searchUncompletedTasksFlow(userId: Long, query: String): Flow<List<Task>>
 }

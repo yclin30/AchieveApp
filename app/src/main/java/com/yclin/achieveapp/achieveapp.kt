@@ -7,6 +7,8 @@ import com.yclin.achieveapp.data.repository.HabitRepository
 import com.yclin.achieveapp.data.repository.HabitRepositoryImpl
 import com.yclin.achieveapp.data.repository.TaskRepository
 import com.yclin.achieveapp.data.repository.TaskRepositoryImpl
+import com.yclin.achieveapp.data.repository.SearchRepository
+import com.yclin.achieveapp.data.repository.SearchRepositoryImpl
 
 class AchieveApp : Application() {
 
@@ -21,6 +23,14 @@ class AchieveApp : Application() {
             database.habitDao(),
             database.habitCompletionDao(),
             RetrofitInstance.api // 这里注入你的网络API
+        )
+    }
+
+    // ✅ 新增：搜索 Repository
+    val searchRepository: SearchRepository by lazy {
+        SearchRepositoryImpl(
+            taskDao = database.taskDao(),
+            habitDao = database.habitDao()
         )
     }
 }

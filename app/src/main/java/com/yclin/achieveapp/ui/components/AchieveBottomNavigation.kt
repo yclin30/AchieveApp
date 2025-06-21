@@ -51,5 +51,6 @@ enum class BottomNavItem(
     DASHBOARD("仪表盘", Icons.Default.Dashboard, Screen.Dashboard.route),
     TASKS("四象限", Icons.Default.GridView, Screen.Tasks.route),
     HABITS("习惯", Icons.Default.Repeat, Screen.Habits.route),
+    SEARCH("搜索", Icons.Default.Search, Screen.Search.route),
     PROFILE("我的", Icons.Default.Person, Screen.Profile.route)
 }

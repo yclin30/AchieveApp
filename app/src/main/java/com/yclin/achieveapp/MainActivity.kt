@@ -37,6 +37,8 @@ import com.yclin.achieveapp.ui.feature_auth.RegisterScreen
 import com.yclin.achieveapp.ui.feature_profile.ProfileScreen
 import com.yclin.achieveapp.ui.feature_auth.AuthViewModel
 import com.yclin.achieveapp.ui.feature_auth.AuthViewModelFactory
+import com.yclin.achieveapp.ui.feature_search.SearchScreen
+import com.yclin.achieveapp.ui.feature_search.SearchViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -238,6 +240,15 @@ class MainActivity : ComponentActivity() {
                                 HabitDetailScreen(
                                     navController = navController,
                                     viewModel = habitDetailViewModel
+                                )
+                            }
+                            // 在你的 NavHost 中添加：
+                            composable(Screen.Search.route) {
+                                SearchScreen(
+                                    navController = navController,
+                                    viewModel = viewModel(
+                                        factory = SearchViewModel.provideFactory(user?.userId ?: -1L) // 你需要传入当前用户ID
+                                    )
                                 )
                             }
                         }
