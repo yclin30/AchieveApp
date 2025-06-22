@@ -5,10 +5,15 @@ import com.yclin.achieveapp.data.database.AchieveDatabase
 import com.yclin.achieveapp.data.network.api.RetrofitInstance // 如果你用 RetrofitInstance
 import com.yclin.achieveapp.data.repository.HabitRepository
 import com.yclin.achieveapp.data.repository.HabitRepositoryImpl
+import com.yclin.achieveapp.data.repository.NotificationRepository
+import com.yclin.achieveapp.data.repository.NotificationRepositoryImpl
+import com.yclin.achieveapp.data.repository.NotificationSettingsRepository
+import com.yclin.achieveapp.data.repository.NotificationSettingsRepositoryImpl
 import com.yclin.achieveapp.data.repository.TaskRepository
 import com.yclin.achieveapp.data.repository.TaskRepositoryImpl
 import com.yclin.achieveapp.data.repository.SearchRepository
 import com.yclin.achieveapp.data.repository.SearchRepositoryImpl
+import com.yclin.achieveapp.notification.NotificationScheduler
 
 class AchieveApp : Application() {
 
@@ -32,5 +37,19 @@ class AchieveApp : Application() {
             taskDao = database.taskDao(),
             habitDao = database.habitDao()
         )
+    }
+    val notificationRepository: NotificationRepository by lazy {
+        NotificationRepositoryImpl(
+            taskDao = database.taskDao(),
+            habitDao = database.habitDao()
+        )
+    }
+
+    val notificationSettingsRepository: NotificationSettingsRepository by lazy {
+        NotificationSettingsRepositoryImpl(this)
+    }
+
+    val notificationScheduler by lazy {
+        NotificationScheduler(this)
     }
 }

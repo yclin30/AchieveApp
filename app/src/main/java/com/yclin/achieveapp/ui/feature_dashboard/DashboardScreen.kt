@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -67,7 +68,7 @@ fun DashboardScreen(
 
             // 问候语
             Text(
-                text = "你好，yclin30！今天是",
+                text = "你好，今天是",
                 style = MaterialTheme.typography.bodyLarge
             )
 
@@ -469,5 +470,94 @@ fun DashboardSection(
         )
         Spacer(modifier = Modifier.height(12.dp))
         content()
+    }
+}
+
+@Composable
+fun QuickSettingsCard(
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "快速设置",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                TextButton(
+                    onClick = { navController.navigate(Screen.Profile.route) }
+                ) {
+                    Text("查看全部")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // 通知设置快捷入口
+                QuickSettingItem(
+                    icon = Icons.Default.Notifications,
+                    label = "通知提醒",
+                    onClick = {
+                        navController.navigate(Screen.NotificationSettings.route)
+                    }
+                )
+
+                // 其他快捷设置
+                QuickSettingItem(
+                    icon = Icons.Default.Palette,
+                    label = "主题",
+                    onClick = { /* 主题设置 */ }
+                )
+
+                QuickSettingItem(
+                    icon = Icons.Default.Backup,
+                    label = "备份",
+                    onClick = { /* 备份设置 */ }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickSettingItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clickable { onClick() }
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(32.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center
+        )
     }
 }

@@ -78,4 +78,16 @@ interface HabitDao {
     ORDER BY name ASC
 """)
     fun searchHabitsFlow(userId: Long, query: String): Flow<List<Habit>>
+
+    @Query("SELECT COUNT(*) FROM habits WHERE userId = :userId  AND deleted = 0")
+    suspend fun getActiveHabitsCount(userId: Long): Int
+
+    @Query("SELECT MAX(longestStreak) FROM habits WHERE userId = :userId AND deleted = 0")
+    suspend fun getLongestStreak(userId: Long): Int
+
+    @Query("SELECT AVG(currentStreak) FROM habits WHERE userId = :userId  AND deleted = 0")
+    suspend fun getAverageStreak(userId: Long): Double
+
+    @Query("SELECT COUNT(*) FROM habits WHERE userId = :userId AND currentStreak > 0 AND deleted = 0")
+    suspend fun getActiveStreakCount(userId: Long): Int
 }

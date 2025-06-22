@@ -1,8 +1,13 @@
 package com.yclin.achieveapp
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -11,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -37,12 +43,35 @@ import com.yclin.achieveapp.ui.feature_auth.RegisterScreen
 import com.yclin.achieveapp.ui.feature_profile.ProfileScreen
 import com.yclin.achieveapp.ui.feature_auth.AuthViewModel
 import com.yclin.achieveapp.ui.feature_auth.AuthViewModelFactory
+import com.yclin.achieveapp.ui.feature_notification.NotificationSettingsScreen
+import com.yclin.achieveapp.ui.feature_notification.NotificationSettingsViewModel
 import com.yclin.achieveapp.ui.feature_search.SearchScreen
 import com.yclin.achieveapp.ui.feature_search.SearchViewModel
 
 class MainActivity : ComponentActivity() {
+
+    // ✅ 权限请求启动器
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // 权限已授予，可以发送通知
+            // 可以显示成功提示或启用通知功能
+        } else {
+            // 权限被拒绝，可以显示说明或引导用户到设置
+            // 你可以在这里显示一个对话框解释为什么需要权限
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ✅ 应用启动时检查和请求通知权限
+        checkAndRequestNotificationPermission()
+
+        // ✅ 存储当前用户ID到SharedPreferences（为通知功能使用）
+        storeCurrentUserId()
+
         setContent {
             AchieveTheme {
                 Surface(
@@ -57,10 +86,16 @@ class MainActivity : ComponentActivity() {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = navBackStackEntry?.destination?.route
 
+                    // ✅ 用户变化时更新存储的用户ID
+                    user?.let { currentUser ->
+                        storeCurrentUserId(currentUser.userId)
+                    }
+
                     val showBottomBar = currentRoute in listOf(
                         Screen.Dashboard.route,
                         Screen.Tasks.route,
                         Screen.Habits.route,
+                        Screen.Search.route, // ✅ 添加搜索页面到底部导航
                         Screen.Profile.route
                     )
 
@@ -116,14 +151,26 @@ class MainActivity : ComponentActivity() {
                             // ========== 我的页面 =========
                             composable(Screen.Profile.route) {
                                 ProfileScreen(
+                                    navController = navController,
                                     user = user,
                                     onLogout = {
                                         authViewModel.logout {
+                                            // ✅ 退出登录时清除用户ID
+                                            clearCurrentUserId()
                                             navController.navigate(Screen.Login.route) {
                                                 popUpTo(0)
                                             }
                                         }
                                     }
+                                )
+                            }
+                            // ✅ 通知设置页面
+                            composable(Screen.NotificationSettings.route) {
+                                NotificationSettingsScreen(
+                                    navController = navController,
+                                    viewModel = viewModel(
+                                        factory = NotificationSettingsViewModel.provideFactory()
+                                    )
                                 )
                             }
                             // ========== 仪表盘 =========
@@ -157,6 +204,15 @@ class MainActivity : ComponentActivity() {
                             composable(Screen.Habits.route) {
                                 HabitListScreen(navController = navController,
                                     userId = user?.userId ?: -1L)
+                            }
+                            // ✅ 搜索页面
+                            composable(Screen.Search.route) {
+                                SearchScreen(
+                                    navController = navController,
+                                    viewModel = viewModel(
+                                        factory = SearchViewModel.provideFactory(user?.userId ?: -1L)
+                                    )
+                                )
                             }
                             // ========== 添加/编辑任务 =========
                             composable(Screen.AddEditTask.route) {
@@ -242,19 +298,67 @@ class MainActivity : ComponentActivity() {
                                     viewModel = habitDetailViewModel
                                 )
                             }
-                            // 在你的 NavHost 中添加：
-                            composable(Screen.Search.route) {
-                                SearchScreen(
-                                    navController = navController,
-                                    viewModel = viewModel(
-                                        factory = SearchViewModel.provideFactory(user?.userId ?: -1L) // 你需要传入当前用户ID
-                                    )
-                                )
-                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    // ✅ 检查和请求通知权限
+    private fun checkAndRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)) {
+                PackageManager.PERMISSION_GRANTED -> {
+                    // 权限已授予，无需操作
+                }
+                else -> {
+                    // 请求权限
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        }
+        // Android 13 以下版本默认有通知权限
+    }
+
+    // ✅ 存储当前用户ID（供通知功能使用）
+    private fun storeCurrentUserId(userId: Long = 1L) {
+        val sharedPref = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        sharedPref.edit()
+            .putLong("current_user_id", userId)
+            .apply()
+    }
+
+    // ✅ 清除用户ID
+    private fun clearCurrentUserId() {
+        val sharedPref = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        sharedPref.edit()
+            .remove("current_user_id")
+            .apply()
+    }
+
+    // ✅ 获取当前用户ID
+    fun getCurrentUserId(): Long {
+        val sharedPref = getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        return sharedPref.getLong("current_user_id", 1L)
+    }
+
+    // ✅ 检查通知权限状态
+    fun isNotificationPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Android 13 以下默认有权限
+        }
+    }
+
+    // ✅ 手动请求通知权限（供设置页面调用）
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }

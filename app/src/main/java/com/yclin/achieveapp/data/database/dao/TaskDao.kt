@@ -107,6 +107,8 @@ interface TaskDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllTasks(tasks: List<Task>)
 
+
+
     @Query("""
     SELECT * FROM tasks 
     WHERE userId = :userId 
@@ -120,8 +122,8 @@ interface TaskDao {
              ELSE 3 END,
         createdAt DESC
 """)
-
     fun getTodayTasksFlow(userId: Long, today: LocalDate = LocalDate.now()): Flow<List<Task>>
+
     @Transaction
     suspend fun replaceAllTasksByUser(userId: Long, newTasks: List<Task>) {
         deleteAllTasksByUser(userId)
@@ -150,4 +152,16 @@ interface TaskDao {
     ORDER BY title ASC
 """)
     fun searchUncompletedTasksFlow(userId: Long, query: String): Flow<List<Task>>
+
+    @Query("SELECT COUNT(*) FROM tasks WHERE userId = :userId AND isCompleted = 1 AND deleted = 0")
+    suspend fun getCompletedTasksCount(userId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM tasks WHERE userId = :userId AND deleted = 0")
+    suspend fun getTotalTasksCount(userId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM tasks WHERE userId = :userId AND isCompleted = 0 AND deleted = 0")
+    suspend fun getPendingTasksCount(userId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM tasks WHERE userId = :userId AND isImportant = 1 AND deleted = 0")
+    suspend fun getImportantTasksCount(userId: Long): Int
 }

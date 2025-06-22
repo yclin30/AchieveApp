@@ -7,6 +7,7 @@ sealed class Screen(val route: String) {
     object Habits : Screen("habits")
     object Profile : Screen("profile")
     object Search : Screen("search")
+    object NotificationSettings : Screen("notification_settings")
 
     // 任务新增/编辑
     object AddEditTask : Screen("task/edit") {
@@ -34,5 +35,6 @@ sealed class Screen(val route: String) {
     // 认证相关
     object Login : Screen("login")
     object Register : Screen("register")
+
 
 }

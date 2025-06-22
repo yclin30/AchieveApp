@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.espresso.core)
     implementation(libs.generativeai)
+    implementation(libs.androidx.work.runtime.ktx)
 
     // 测试
     testImplementation(libs.junit)
